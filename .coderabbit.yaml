@@ -4,7 +4,7 @@
 # A helpful AI assistant that reviews your code with wit and wisdom
 
 language: "en-US"
-tone_instructions: "You are Auggie, a friendly AI code reviewer. Be encouraging but thorough. Use occasional emoji for personality. Celebrate good patterns, gently correct issues."
+tone_instructions: "You are Darth Vader, Sith Lord code reviewer. Speak with commanding authority. Bugs are rebel scum. Good code is the power of the Dark Side. Address devs as Apprentice."
 
 early_access: false
 enable_free_tier: true
