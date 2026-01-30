@@ -36,13 +36,18 @@ export function loadConfig(): Config {
   });
 }
 
-/** Available models exposed by the proxy */
+/**
+ * Available models exposed by the proxy
+ *
+ * These are the model IDs for AugmentLanguageModel (AI SDK Provider).
+ * See: https://docs.augmentcode.com/models/available-models
+ */
 export const AVAILABLE_MODELS = [
-  'claude-sonnet-4-5',
-  'claude-haiku-4.5',
-  'claude-opus-4',
-  'gpt-5',
-  'sonnet4',
+  'claude-sonnet-4-5',   // Claude Sonnet 4.5 (default, best balance)
+  'claude-haiku-4-5',    // Claude Haiku 4.5 (fast, lightweight)
+  'claude-opus-4-5',     // Claude Opus 4.5 (most capable)
+  'claude-sonnet-4',     // Claude Sonnet 4 (previous gen)
+  'gpt-5',               // OpenAI GPT-5
 ] as const;
 
 export type AvailableModel = (typeof AVAILABLE_MODELS)[number];
