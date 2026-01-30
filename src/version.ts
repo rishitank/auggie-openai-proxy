@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 interface PackageJson {
   version: string;
   name: string;
-  description: string;
+  description?: string;
 }
 
 /**
@@ -23,8 +23,14 @@ function loadPackageJson(): PackageJson {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   // Navigate from src/ or dist/ to project root
   const packagePath = join(__dirname, '..', 'package.json');
-  const content = readFileSync(packagePath, 'utf-8');
-  return JSON.parse(content) as PackageJson;
+  try {
+    const content = readFileSync(packagePath, 'utf-8');
+    return JSON.parse(content) as PackageJson;
+  } catch (error) {
+    throw new Error(
+      `Failed to load package.json: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 // Cache the package.json data
@@ -42,4 +48,4 @@ export const VERSION: string = getPackageJson().version;
 export const NAME: string = getPackageJson().name;
 
 /** Application description from package.json */
-export const DESCRIPTION: string = getPackageJson().description;
+export const DESCRIPTION: string = getPackageJson().description ?? '';

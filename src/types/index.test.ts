@@ -95,6 +95,20 @@ describe('types', () => {
       const req = { messages: [{ role: 'user', content: 'Hi' }], temperature: 3 };
       expect(() => ChatCompletionRequestSchema.parse(req)).toThrow();
     });
+
+    it('should accept temperature at boundaries', () => {
+      const reqMin = { messages: [{ role: 'user', content: 'Hi' }], temperature: 0 };
+      const reqMax = { messages: [{ role: 'user', content: 'Hi' }], temperature: 2 };
+      expect(ChatCompletionRequestSchema.parse(reqMin).temperature).toBe(0);
+      expect(ChatCompletionRequestSchema.parse(reqMax).temperature).toBe(2);
+    });
+
+    it('should reject non-positive max_tokens', () => {
+      const reqZero = { messages: [{ role: 'user', content: 'Hi' }], max_tokens: 0 };
+      const reqNeg = { messages: [{ role: 'user', content: 'Hi' }], max_tokens: -1 };
+      expect(() => ChatCompletionRequestSchema.parse(reqZero)).toThrow();
+      expect(() => ChatCompletionRequestSchema.parse(reqNeg)).toThrow();
+    });
   });
 
   describe('WebhookRequestSchema', () => {

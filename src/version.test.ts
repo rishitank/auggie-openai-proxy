@@ -9,7 +9,7 @@ import { VERSION, NAME, DESCRIPTION } from './version';
 describe('version', () => {
   describe('VERSION', () => {
     it('should be a valid semver string', () => {
-      expect(VERSION).toMatch(/^\d+\.\d+\.\d+/);
+      expect(VERSION).toMatch(/^\d+\.\d+\.\d+(-[\w.]+)?(\+[\w.]+)?$/);
     });
 
     it('should match package.json version', async () => {
@@ -20,10 +20,6 @@ describe('version', () => {
   });
 
   describe('NAME', () => {
-    it('should be the package name', () => {
-      expect(NAME).toBe('auggie-openai-proxy');
-    });
-
     it('should match package.json name', async () => {
       const pkg = await import('../package.json', { with: { type: 'json' } });
       expect(NAME).toBe(pkg.default.name);

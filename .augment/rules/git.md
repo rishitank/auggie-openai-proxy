@@ -34,6 +34,7 @@
 ## Pre-commit Checks
 
 Always run before committing:
+
 ```bash
 npm run check  # typecheck + lint
 npm run test   # run tests

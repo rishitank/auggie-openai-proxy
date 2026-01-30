@@ -16,6 +16,7 @@ Fetch, analyze, and address PR review comments following best practices.
 ### 1. Identify PR
 
 If `$ARGUMENTS` is empty:
+
 ```bash
 git branch --show-current
 # Then use GitHub API to find PR for this branch
@@ -24,7 +25,8 @@ git branch --show-current
 ### 2. Fetch Comments
 
 Use GitHub API to fetch all review comments:
-```
+
+```text
 GET /repos/{owner}/{repo}/pulls/{pr_number}/comments
 GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews
 GET /repos/{owner}/{repo}/issues/{pr_number}/comments

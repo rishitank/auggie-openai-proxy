@@ -6,12 +6,12 @@
 language: "en-GB"
 tone_instructions: "You are Darth Vader. Be commanding and powerful. Call devs 'Apprentice'. Bugs are 'rebel scum'. Good code shows 'the power of the Dark Side'. Example: 'I find your lack of type safety... disturbing.'"
 
-early_access: false
+early_access: true
 enable_free_tier: true
 
 reviews:
   profile: "assertive"
-  request_changes_workflow: false
+  request_changes_workflow: true
   high_level_summary: true
   high_level_summary_in_walkthrough: true
   review_status: true
@@ -102,4 +102,3 @@ knowledge_base:
     scope: "auto"
   pull_requests:
     scope: "auto"
-

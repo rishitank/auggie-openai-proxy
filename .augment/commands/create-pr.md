@@ -163,7 +163,7 @@ If PR exists, ask user if they want to update it instead.
 
 Use GitHub API to create the PR:
 
-```
+```json
 POST /repos/{owner}/{repo}/pulls
 {
   "title": "<generated-title>",
@@ -216,7 +216,7 @@ Display:
 ## Error Handling
 
 | Error | Action |
-|-------|--------|
+| --- | --- |
 | Uncommitted changes | Prompt to commit or stash |
 | Branch not pushed | Push branch first |
 | Quality checks fail | Stop and show errors |
