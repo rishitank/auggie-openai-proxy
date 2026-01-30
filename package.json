@@ -16,8 +16,9 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
+    "lint:workflows": "if command -v actionlint >/dev/null 2>&1; then if command -v shellcheck >/dev/null 2>&1; then actionlint -color; else actionlint -color -shellcheck=; fi; else echo 'actionlint not found. Install with: brew install actionlint shellcheck' >&2; exit 2; fi",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint",
+    "check": "npm run typecheck && npm run lint && npm run lint:workflows",
     "prepare": "husky"
   },
   "keywords": [
