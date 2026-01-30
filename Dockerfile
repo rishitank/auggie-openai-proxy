@@ -1,6 +1,6 @@
 # Auggie OpenAI Proxy Dockerfile
-# Using Node.js 24 (latest) with Alpine for minimal image size
-FROM node:24-alpine AS builder
+# Using Node.js 25 (latest) with Alpine for minimal image size
+FROM node:25-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY src ./src
 RUN npm run typecheck && npm run build
 
 # Production stage - minimal runtime image
-FROM node:24-alpine AS runner
+FROM node:25-alpine AS runner
 
 WORKDIR /app
 
