@@ -1,6 +1,7 @@
 # Auggie OpenAI Proxy Dockerfile
-# Using Node.js 25 (latest) with Alpine for minimal image size
-FROM node:25-alpine AS builder
+# Node version is defined in .nvmrc (single source of truth)
+ARG NODE_VERSION=25
+FROM node:${NODE_VERSION}-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +19,8 @@ COPY src ./src
 RUN npm run typecheck && npm run build
 
 # Production stage - minimal runtime image
-FROM node:25-alpine AS runner
+ARG NODE_VERSION=25
+FROM node:${NODE_VERSION}-alpine AS runner
 
 WORKDIR /app
 

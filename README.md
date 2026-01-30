@@ -19,7 +19,7 @@ Built following SOLID principles:
 - **Dependency Inversion** - Depends on abstractions (interfaces)
 
 Tech stack:
-- **Node.js 25** (latest)
+- **Node.js** (version in `.nvmrc`)
 - **TypeScript 5.8** with ESNext target
 - **Express 5** for HTTP handling
 - **Zod** for runtime validation
@@ -29,6 +29,10 @@ Tech stack:
 
 ```bash
 cd auggie-proxy
+
+# Use correct Node version (requires nvm)
+nvm use
+
 npm install
 ```
 
@@ -185,7 +189,10 @@ Configure IFTTT webhook to POST to `/ifttt/webhook`:
 ## 🐳 Docker
 
 ```bash
-docker build -t auggie-proxy .
+# Build using Node version from .nvmrc
+docker build -t auggie-proxy --build-arg NODE_VERSION=$(cat .nvmrc) .
+
+# Run
 docker run -p 3456:3456 -e AUGMENT_API_TOKEN=xxx auggie-proxy
 ```
 
