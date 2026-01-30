@@ -1,5 +1,6 @@
-/** @type {import('@commitlint/types').UserConfig} */
-export default {
+import type { UserConfig } from '@commitlint/types';
+
+const config: UserConfig = {
   extends: ['@commitlint/config-conventional'],
   rules: {
     // Allow Jira-style prefixes: CORE-123: description
@@ -7,3 +8,5 @@ export default {
     'header-max-length': [2, 'always', 100],
   },
 };
+
+export default config;
