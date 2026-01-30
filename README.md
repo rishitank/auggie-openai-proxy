@@ -1,6 +1,6 @@
 # 🚀 Auggie OpenAI Proxy
 
-An OpenAI-compatible API proxy that exposes [Augment Code's](https://www.augmentcode.com/) AI capabilities through a standard OpenAI API interface. Use Augment's powerful models with **any OpenAI-compatible client**.
+An OpenAI-compatible API proxy that exposes [Augment Code's](https://www.augmentcode.com/) AI capabilities through a standard OpenAI API. Use Augment's powerful models with **any OpenAI-compatible client**.
 
 ## ✨ Features
 
@@ -379,7 +379,7 @@ Models available through [Augment Code](https://www.augmentcode.com/):
 
 | Model | Description | Use Case |
 |-------|-------------|----------|
-| `claude-sonnet-4-5` | [Claude Sonnet 4.5](https://www.anthropic.com/claude) | Default, best balance of speed/quality |
+| `claude-sonnet-4-5` | [Claude Sonnet 4.5](https://www.anthropic.com/claude) | The default, best balance of speed/quality |
 | `claude-haiku-4-5` | [Claude Haiku 4.5](https://www.anthropic.com/claude) | Fast, lightweight tasks |
 | `claude-opus-4-5` | [Claude Opus 4.5](https://www.anthropic.com/claude) | Most capable, complex reasoning |
 | `claude-sonnet-4` | [Claude Sonnet 4](https://www.anthropic.com/claude) | Previous generation |

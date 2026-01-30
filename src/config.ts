@@ -6,17 +6,7 @@
  */
 
 import { z } from 'zod';
-
-/** Schema for a single named webhook */
-const WebhookConfigSchema = z.object({
-  name: z.string(),
-  description: z.string().optional(),
-  enabled: z.boolean().default(true),
-  llmBaseUrl: z.string().optional(),
-  llmApiKey: z.string().default('not-needed'),
-  model: z.string().optional(),
-  systemPrompt: z.string().optional(),
-});
+import { WebhookConfigSchema, type WebhookConfig } from '@types';
 
 const ConfigSchema = z.object({
   port: z.coerce.number().int().positive().default(3456),
@@ -36,7 +26,7 @@ const ConfigSchema = z.object({
   webhooks: z.array(WebhookConfigSchema).default([]),
 });
 
-export type WebhookConfig = z.infer<typeof WebhookConfigSchema>;
+export type { WebhookConfig };
 export type Config = z.infer<typeof ConfigSchema>;
 
 /**
@@ -56,6 +46,7 @@ function parseWebhooksFromEnv(): z.infer<typeof WebhookConfigSchema>[] {
       return [];
     }
     // Validate each webhook through Zod to apply defaults and catch errors
+    const seen = new Set<string>();
     return parsed
       .map((item, index) => {
         const result = WebhookConfigSchema.safeParse(item);
@@ -68,7 +59,15 @@ function parseWebhooksFromEnv(): z.infer<typeof WebhookConfigSchema>[] {
         }
         return result.data;
       })
-      .filter((w): w is z.infer<typeof WebhookConfigSchema> => w !== null);
+      .filter((w): w is z.infer<typeof WebhookConfigSchema> => w !== null)
+      .filter((w) => {
+        if (seen.has(w.name)) {
+          console.warn(`[Config] Duplicate webhook name '${w.name}', skipping`);
+          return false;
+        }
+        seen.add(w.name);
+        return true;
+      });
   } catch {
     console.warn('[Config] Failed to parse WEBHOOKS JSON, ignoring');
     return [];

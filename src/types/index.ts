@@ -70,14 +70,17 @@ export const WebhookRequestSchema = z
   })
   .refine(
     (data) =>
-      Boolean(data.text) ||
-      Boolean(data.prompt) ||
-      Boolean(data.message) ||
-      Boolean(data.query) ||
-      Boolean(data.content) ||
-      Boolean(data.input) ||
-      Boolean(data.value1) ||
-      Boolean(data.value2),
+      [
+        data.text,
+        data.prompt,
+        data.message,
+        data.query,
+        data.content,
+        data.input,
+        data.value1,
+        data.value2,
+        data.value3,
+      ].some((v) => typeof v === 'string' && v.trim() !== ''),
     { message: 'At least one message field is required' }
   );
 export type WebhookRequest = z.infer<typeof WebhookRequestSchema>;
