@@ -26,7 +26,7 @@
     "ai",
     "chatbot"
   ],
-  "author": "Montbot",
+  "author": "Rishi Tank <tank.rishi@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "@augmentcode/auggie-sdk": "^0.1.14",
