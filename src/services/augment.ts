@@ -7,7 +7,7 @@
  */
 
 import { AugmentLanguageModel, resolveAugmentCredentials } from '@augmentcode/auggie-sdk';
-import { generateText, streamText, type CoreMessage } from 'ai';
+import { generateText, streamText, type CoreMessage, type LanguageModel } from 'ai';
 import type { AugmentCredentials, ChatCompletionResult } from '../types/index.js';
 import { AVAILABLE_MODELS } from '../config.js';
 
@@ -59,13 +59,20 @@ export class AugmentService {
 
   /**
    * Generate a chat completion (non-streaming)
+   *
+   * Note: Type assertion via unknown is needed because @augmentcode/auggie-sdk
+   * may not be fully aligned with the latest AI SDK LanguageModelV1 interface.
+   * This is safe as AugmentLanguageModel implements the required methods.
    */
   async generateCompletion(
     messages: CoreMessage[],
     modelName: string
   ): Promise<ChatCompletionResult> {
     const model = this.createModel(modelName);
-    const result = await generateText({ model, messages });
+    const result = await generateText({
+      model: model as unknown as LanguageModel,
+      messages,
+    });
 
     return {
       text: result.text,
@@ -77,13 +84,19 @@ export class AugmentService {
 
   /**
    * Stream a chat completion
+   *
+   * Note: Type assertion via unknown is needed because @augmentcode/auggie-sdk
+   * may not be fully aligned with the latest AI SDK LanguageModelV1 interface.
    */
   async *streamCompletion(
     messages: CoreMessage[],
     modelName: string
   ): AsyncGenerator<string, void, unknown> {
     const model = this.createModel(modelName);
-    const { textStream } = streamText({ model, messages });
+    const { textStream } = streamText({
+      model: model as unknown as LanguageModel,
+      messages,
+    });
 
     for await (const chunk of textStream) {
       yield chunk;
