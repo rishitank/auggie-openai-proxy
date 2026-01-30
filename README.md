@@ -1,15 +1,15 @@
 # 🚀 Auggie OpenAI Proxy
 
-An OpenAI-compatible API proxy that exposes [Augment Code's](https://augmentcode.com) AI capabilities through a standard OpenAI API interface. Use Augment's powerful models with **any OpenAI-compatible client**.
+An OpenAI-compatible API proxy that exposes [Augment Code's](https://www.augmentcode.com/) AI capabilities through a standard OpenAI API interface. Use Augment's powerful models with **any OpenAI-compatible client**.
 
 ## ✨ Features
 
 - **OpenAI API Compatibility** - Drop-in replacement for OpenAI's `/v1/chat/completions`
 - **Streaming Support** - Real-time SSE streaming responses
 - **Context Enhancement** - Automatically enrich prompts with codebase context
-- **Multiple Models** - Access Claude Sonnet/Haiku/Opus 4.5, GPT-5
-- **Request Validation** - Zod schemas for runtime type safety
-- **IFTTT Webhook** - Google Assistant integration endpoint
+- **Multiple Models** - Access Claude Sonnet/Haiku/Opus 4.5, GPT-5 (see [Available Models](#-available-models))
+- **Request Validation** - [Zod](https://zod.dev/) schemas for runtime type safety
+- **IFTTT Webhook** - [Google Assistant](https://assistant.google.com/) integration via [IFTTT](https://ifttt.com/)
 
 ## 🏗️ Architecture
 
@@ -19,11 +19,12 @@ Built following SOLID principles:
 - **Dependency Inversion** - Depends on abstractions (interfaces)
 
 Tech stack:
-- **Node.js** (version in `.nvmrc`)
-- **TypeScript 5.8** with ESNext target
-- **Express 5** for HTTP handling
-- **Zod** for runtime validation
-- **Vitest** for testing
+- **[Node.js](https://nodejs.org/)** (version in `.nvmrc`)
+- **[TypeScript](https://www.typescriptlang.org/) 5.8** with ESNext target
+- **[Express 5](https://expressjs.com/)** for HTTP handling
+- **[Zod](https://zod.dev/)** for runtime validation
+- **[Vitest](https://vitest.dev/)** for testing
+- **[tsup](https://tsup.egoist.dev/)** for bundling
 
 ## 📦 Installation
 
@@ -82,7 +83,7 @@ npm test
 
 ## 🔌 Usage Examples
 
-### Python (OpenAI SDK)
+### Python ([OpenAI SDK](https://github.com/openai/openai-python))
 
 ```python
 from openai import OpenAI
@@ -92,14 +93,15 @@ client = OpenAI(
     api_key="not-needed"  # Uses Augment session
 )
 
+# Use any available model (see Available Models section)
 response = client.chat.completions.create(
-    model="claude-sonnet-4-5",
+    model="claude-sonnet-4-5",  # or claude-opus-4-5, claude-haiku-4-5, gpt-5
     messages=[{"role": "user", "content": "Hello!"}]
 )
 print(response.choices[0].message.content)
 ```
 
-### Node.js (OpenAI SDK)
+### Node.js ([OpenAI SDK](https://github.com/openai/openai-node))
 
 ```typescript
 import OpenAI from 'openai';
@@ -109,8 +111,9 @@ const client = new OpenAI({
   apiKey: 'not-needed',
 });
 
+// Use any available model (see Available Models section)
 const response = await client.chat.completions.create({
-  model: 'claude-sonnet-4-5',
+  model: 'claude-opus-4-5',  // or claude-sonnet-4-5, claude-haiku-4-5, gpt-5
   messages: [{ role: 'user', content: 'Hello!' }],
 });
 console.log(response.choices[0].message.content);
@@ -119,10 +122,11 @@ console.log(response.choices[0].message.content);
 ### cURL
 
 ```bash
+# Use any available model
 curl http://localhost:3456/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "claude-sonnet-4-5",
+    "model": "claude-haiku-4-5",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
@@ -133,13 +137,13 @@ curl http://localhost:3456/v1/chat/completions \
 curl http://localhost:3456/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "claude-sonnet-4-5",
+    "model": "gpt-5",
     "messages": [{"role": "user", "content": "Hello!"}],
     "stream": true
   }'
 ```
 
-### LangChain
+### [LangChain](https://python.langchain.com/)
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -147,15 +151,15 @@ from langchain_openai import ChatOpenAI
 llm = ChatOpenAI(
     base_url="http://localhost:3456/v1",
     api_key="not-needed",
-    model="claude-sonnet-4-5"
+    model="claude-sonnet-4-5"  # or any available model
 )
 
 response = llm.invoke("Hello!")
 ```
 
-### Clawdbot
+### [Moltbot](https://www.molt.bot/)
 
-Add to `clawdbot.json`:
+[Moltbot](https://www.molt.bot/) is a personal AI assistant that supports OpenAI-compatible APIs. Add to your `moltbot.json` (or `clawdbot.json`):
 
 ```json
 {
@@ -164,6 +168,21 @@ Add to `clawdbot.json`:
       "api": "openai-completions",
       "baseUrl": "http://localhost:3456/v1",
       "model": "claude-sonnet-4-5"
+    },
+    "augment/claude-opus-4-5": {
+      "api": "openai-completions",
+      "baseUrl": "http://localhost:3456/v1",
+      "model": "claude-opus-4-5"
+    },
+    "augment/claude-haiku-4-5": {
+      "api": "openai-completions",
+      "baseUrl": "http://localhost:3456/v1",
+      "model": "claude-haiku-4-5"
+    },
+    "augment/gpt-5": {
+      "api": "openai-completions",
+      "baseUrl": "http://localhost:3456/v1",
+      "model": "gpt-5"
     }
   }
 }
@@ -178,9 +197,9 @@ Add to `clawdbot.json`:
 | POST | `/v1/chat/completions` | Chat completions (OpenAI format) |
 | POST | `/ifttt/webhook` | IFTTT webhook for Google Assistant |
 
-## 🎙️ Google Assistant (IFTTT)
+## 🎙️ Google Assistant ([IFTTT](https://ifttt.com/))
 
-Configure IFTTT webhook to POST to `/ifttt/webhook`:
+Configure an [IFTTT](https://ifttt.com/) webhook to POST to `/ifttt/webhook` for [Google Assistant](https://assistant.google.com/) integration:
 
 ```json
 { "value1": "command", "value2": "extracted text" }
@@ -198,13 +217,17 @@ docker run -p 3456:3456 -e AUGMENT_API_TOKEN=xxx auggie-proxy
 
 ## 📋 Available Models
 
-| Model | Description |
-|-------|-------------|
-| `claude-sonnet-4-5` | Claude Sonnet 4.5 (default, best balance) |
-| `claude-haiku-4-5` | Claude Haiku 4.5 (fast, lightweight) |
-| `claude-opus-4-5` | Claude Opus 4.5 (most capable) |
-| `claude-sonnet-4` | Claude Sonnet 4 (previous gen) |
-| `gpt-5` | OpenAI GPT-5 |
+Models available through [Augment Code](https://www.augmentcode.com/):
+
+| Model | Description | Use Case |
+|-------|-------------|----------|
+| `claude-sonnet-4-5` | [Claude Sonnet 4.5](https://www.anthropic.com/claude) | Default, best balance of speed/quality |
+| `claude-haiku-4-5` | [Claude Haiku 4.5](https://www.anthropic.com/claude) | Fast, lightweight tasks |
+| `claude-opus-4-5` | [Claude Opus 4.5](https://www.anthropic.com/claude) | Most capable, complex reasoning |
+| `claude-sonnet-4` | [Claude Sonnet 4](https://www.anthropic.com/claude) | Previous generation |
+| `gpt-5` | [OpenAI GPT-5](https://openai.com/) | OpenAI's latest model |
+
+> **Tip:** Use `GET /v1/models` to list all available models at runtime.
 
 ## 🔍 Context Enhancement
 

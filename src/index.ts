@@ -17,11 +17,11 @@
  */
 
 import express, { type Request, type Response } from 'express';
-import { loadConfig } from '@/config';
-import { initializeAugment } from '@/services/augment';
-import { initializeContextService, getContextService } from '@/services/context';
-import { handleChatCompletion, handleModelsList, handleIFTTTWebhook } from '@/handlers/index';
-import { errorHandler, requestLogger } from '@/middleware/index';
+import { loadConfig } from '@config';
+import { initializeAugment } from '@services/augment';
+import { initializeContextService, getContextService } from '@services/context';
+import { handleChatCompletion, handleModelsList, handleIFTTTWebhook } from '@handlers/index';
+import { errorHandler, requestLogger } from '@middleware/index';
 
 // =============================================================================
 // Application Setup
@@ -91,9 +91,10 @@ async function main(): Promise<void> {
       console.log(`   POST /v1/chat/completions - Chat completions`);
       console.log(`   POST /ifttt/webhook       - Google Assistant webhook`);
       console.log(`\n🔧 Context Enhancement: ${contextService.isReady() ? 'ENABLED' : 'DISABLED'}`);
-      console.log(`\n💡 Clawdbot config:`);
+      console.log(`\n💡 Moltbot config:`);
       console.log(`   baseUrl: "http://${config.host}:${String(config.port)}/v1"`);
-      console.log(`   api: "openai-completions"\n`);
+      console.log(`   api: "openai-completions"`);
+      console.log(`   models: claude-sonnet-4-5, claude-opus-4-5, claude-haiku-4-5, gpt-5\n`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

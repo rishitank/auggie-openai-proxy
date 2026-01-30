@@ -6,8 +6,8 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { getAugmentService } from '@/services/augment';
-import { MessageRole, IFTTTWebhookRequestSchema } from '@/types';
+import { getAugmentService } from '@services/augment';
+import { MessageRole, IFTTTWebhookRequestSchema } from '@types';
 
 /** Default model for IFTTT requests */
 const DEFAULT_MODEL = 'claude-sonnet-4-5';
