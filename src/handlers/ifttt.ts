@@ -29,9 +29,9 @@ export async function handleIFTTTWebhook(
     }
 
     const { value1, value2 } = parseResult.data;
-    const commandText = value2 ?? value1;
+    const commandText = value2 ?? value1 ?? '';
 
-    if (!commandText) {
+    if (commandText === '') {
       res.status(400).json({ error: 'Missing command text (value1 or value2)' });
       return;
     }

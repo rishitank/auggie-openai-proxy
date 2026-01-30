@@ -25,14 +25,14 @@ export type Config = z.infer<typeof ConfigSchema>;
  */
 export function loadConfig(): Config {
   return ConfigSchema.parse({
-    port: process.env['PORT'],
-    host: process.env['HOST'],
+    port: process.env.PORT,
+    host: process.env.HOST,
     augment: {
-      apiToken: process.env['AUGMENT_API_TOKEN'],
-      apiUrl: process.env['AUGMENT_API_URL'],
+      apiToken: process.env.AUGMENT_API_TOKEN,
+      apiUrl: process.env.AUGMENT_API_URL,
     },
-    defaultModel: process.env['DEFAULT_MODEL'],
-    logLevel: process.env['LOG_LEVEL'],
+    defaultModel: process.env.DEFAULT_MODEL,
+    logLevel: process.env.LOG_LEVEL,
   });
 }
 

@@ -7,7 +7,6 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import type { CoreMessage } from 'ai';
 import { randomUUID } from 'node:crypto';
 import { getAugmentService } from '../services/augment.js';
 import {
@@ -18,15 +17,25 @@ import {
   type TokenUsage,
 } from '../types/index.js';
 
+/** Message format for the service */
+interface ChatMessage {
+  readonly role: 'system' | 'user' | 'assistant';
+  readonly content: string;
+}
+
 // =============================================================================
 // Response Builders (DRY - reusable response construction)
 // =============================================================================
 
 /** Generate a unique completion ID */
-const generateCompletionId = (): string => `chatcmpl-${randomUUID()}`;
+function generateCompletionId(): string {
+  return `chatcmpl-${randomUUID()}`;
+}
 
 /** Get current Unix timestamp */
-const getCurrentTimestamp = (): number => Math.floor(Date.now() / 1000);
+function getCurrentTimestamp(): number {
+  return Math.floor(Date.now() / 1000);
+}
 
 /**
  * Build a complete chat completion response
@@ -36,13 +45,14 @@ function buildCompletionResponse(
   model: string,
   usage?: { promptTokens: number; completionTokens: number }
 ): ChatCompletionResponse {
-  const tokenUsage: TokenUsage | undefined = usage
-    ? {
-        prompt_tokens: usage.promptTokens,
-        completion_tokens: usage.completionTokens,
-        total_tokens: usage.promptTokens + usage.completionTokens,
-      }
-    : undefined;
+  const tokenUsage: TokenUsage | undefined =
+    usage !== undefined
+      ? {
+          prompt_tokens: usage.promptTokens,
+          completion_tokens: usage.completionTokens,
+          total_tokens: usage.promptTokens + usage.completionTokens,
+        }
+      : undefined;
 
   return {
     id: generateCompletionId(),
@@ -84,17 +94,18 @@ function buildStreamChunk(
 }
 
 /** Serialize chunk to SSE format */
-const toSSE = (chunk: StreamChunkResponse): string =>
-  `data: ${JSON.stringify(chunk)}\n\n`;
+function toSSE(chunk: StreamChunkResponse): string {
+  return `data: ${JSON.stringify(chunk)}\n\n`;
+}
 
 // =============================================================================
 // Message Conversion
 // =============================================================================
 
 /**
- * Convert OpenAI messages to Vercel AI SDK CoreMessage format
+ * Convert OpenAI messages to service format
  */
-function toCoreMesages(messages: readonly OpenAIMessage[]): CoreMessage[] {
+function toChatMessages(messages: readonly OpenAIMessage[]): ChatMessage[] {
   return messages.map((msg) => ({ role: msg.role, content: msg.content }));
 }
 
@@ -124,10 +135,10 @@ export async function handleChatCompletion(
     }
 
     const { model, messages, stream } = parseResult.data;
-    const coreMessages = toCoreMesages(messages);
+    const chatMessages = toChatMessages(messages);
     const service = getAugmentService();
 
-    console.log(`[Chat] Model: ${model}, Messages: ${messages.length}, Stream: ${stream}`);
+    console.log(`[Chat] Model: ${model}, Messages: ${String(messages.length)}, Stream: ${String(stream)}`);
 
     if (stream) {
       // Set SSE headers
@@ -136,7 +147,7 @@ export async function handleChatCompletion(
       res.setHeader('Connection', 'keep-alive');
 
       // Stream chunks
-      for await (const chunk of service.streamCompletion(coreMessages, model)) {
+      for await (const chunk of service.streamCompletion(chatMessages, model)) {
         res.write(toSSE(buildStreamChunk(chunk, model)));
       }
 
@@ -146,7 +157,7 @@ export async function handleChatCompletion(
       res.end();
     } else {
       // Non-streaming response
-      const result = await service.generateCompletion(coreMessages, model);
+      const result = await service.generateCompletion(chatMessages, model);
       res.json(buildCompletionResponse(result.text, model, result.usage));
     }
   } catch (error) {

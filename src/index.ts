@@ -67,15 +67,15 @@ async function main(): Promise<void> {
     console.log('✅ Auggie SDK initialized');
 
     app.listen(config.port, config.host, () => {
-      console.log(`\n🎉 Auggie OpenAI Proxy v1.1.0`);
-      console.log(`   Running at http://${config.host}:${config.port}`);
+      console.log(`\n🎉 Auggie OpenAI Proxy v1.2.0`);
+      console.log(`   Running at http://${config.host}:${String(config.port)}`);
       console.log(`\n📡 Endpoints:`);
       console.log(`   GET  /health              - Health check`);
       console.log(`   GET  /v1/models           - List available models`);
       console.log(`   POST /v1/chat/completions - Chat completions`);
       console.log(`   POST /ifttt/webhook       - Google Assistant webhook`);
       console.log(`\n💡 Clawdbot config:`);
-      console.log(`   baseUrl: "http://${config.host}:${config.port}/v1"`);
+      console.log(`   baseUrl: "http://${config.host}:${String(config.port)}/v1"`);
       console.log(`   api: "openai-completions"\n`);
     });
   } catch (error) {
@@ -84,5 +84,5 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+void main();
 

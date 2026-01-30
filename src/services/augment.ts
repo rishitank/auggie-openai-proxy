@@ -4,12 +4,44 @@
  * Single Responsibility: Manages Augment SDK interactions
  * Open/Closed: Extensible via AugmentService class, closed for modification
  * Dependency Inversion: Depends on abstractions (interfaces), not concretions
+ *
+ * This module uses the AugmentLanguageModel directly via its doGenerate/doStream
+ * methods to avoid AI SDK version conflicts.
  */
 
-import { AugmentLanguageModel, resolveAugmentCredentials } from '@augmentcode/auggie-sdk';
-import { generateText, streamText, type CoreMessage, type LanguageModel } from 'ai';
+import {
+  AugmentLanguageModel,
+  resolveAugmentCredentials,
+  type AugmentCredentials as SdkCredentials,
+} from '@augmentcode/auggie-sdk';
 import type { AugmentCredentials, ChatCompletionResult } from '../types/index.js';
 import { AVAILABLE_MODELS } from '../config.js';
+
+/** Message format compatible with Augment SDK */
+interface ChatMessage {
+  readonly role: 'system' | 'user' | 'assistant';
+  readonly content: string;
+}
+
+/** LanguageModelV2 message types */
+interface SystemMessage { role: 'system'; content: string }
+interface UserMessage { role: 'user'; content: { type: 'text'; text: string }[] }
+interface AssistantMessage { role: 'assistant'; content: { type: 'text'; text: string }[] }
+type LMV2Message = SystemMessage | UserMessage | AssistantMessage;
+
+/**
+ * Convert a ChatMessage to the proper LanguageModelV2 message format
+ */
+function toLanguageModelMessage(msg: ChatMessage): LMV2Message {
+  switch (msg.role) {
+    case 'system':
+      return { role: 'system', content: msg.content };
+    case 'user':
+      return { role: 'user', content: [{ type: 'text', text: msg.content }] };
+    case 'assistant':
+      return { role: 'assistant', content: [{ type: 'text', text: msg.content }] };
+  }
+}
 
 /**
  * Service class for Augment SDK operations
@@ -23,14 +55,14 @@ export class AugmentService {
    * Tries environment variables first, then falls back to session file
    */
   async initialize(envToken?: string, envUrl?: string): Promise<void> {
-    if (envToken && envUrl) {
+    if (envToken !== undefined && envToken !== '' && envUrl !== undefined && envUrl !== '') {
       this.credentials = { apiKey: envToken, apiUrl: envUrl };
       console.log('📝 Using credentials from environment variables');
       return;
     }
 
     try {
-      const resolved = await resolveAugmentCredentials();
+      const resolved: SdkCredentials = await resolveAugmentCredentials();
       this.credentials = { apiKey: resolved.apiKey, apiUrl: resolved.apiUrl };
       console.log('📝 Using credentials from session file');
     } catch {
@@ -51,7 +83,7 @@ export class AugmentService {
    * Create a language model instance for the specified model name
    */
   private createModel(modelName: string): AugmentLanguageModel {
-    if (!this.credentials) {
+    if (this.credentials === null) {
       throw new Error('AugmentService not initialized. Call initialize() first.');
     }
     return new AugmentLanguageModel(modelName, this.credentials);
@@ -60,46 +92,65 @@ export class AugmentService {
   /**
    * Generate a chat completion (non-streaming)
    *
-   * Note: Type assertion via unknown is needed because @augmentcode/auggie-sdk
-   * may not be fully aligned with the latest AI SDK LanguageModelV1 interface.
-   * This is safe as AugmentLanguageModel implements the required methods.
+   * Uses doGenerate directly to avoid AI SDK version conflicts.
    */
   async generateCompletion(
-    messages: CoreMessage[],
+    messages: readonly ChatMessage[],
     modelName: string
   ): Promise<ChatCompletionResult> {
     const model = this.createModel(modelName);
-    const result = await generateText({
-      model: model as unknown as LanguageModel,
-      messages,
-    });
+    const prompt = messages.map(toLanguageModelMessage);
+
+    // Call doGenerate directly on the language model
+    const result = await model.doGenerate({ prompt });
+
+    // Extract text from content array
+    const textContent = result.content
+      .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+      .map((c) => c.text)
+      .join('');
+
+    // Safely extract token counts
+    const inputTokens = result.usage.inputTokens ?? 0;
+    const outputTokens = result.usage.outputTokens ?? 0;
 
     return {
-      text: result.text,
-      usage: result.usage
-        ? { promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens }
-        : undefined,
+      text: textContent,
+      usage:
+        inputTokens > 0 || outputTokens > 0
+          ? { promptTokens: inputTokens, completionTokens: outputTokens }
+          : undefined,
     };
   }
 
   /**
    * Stream a chat completion
    *
-   * Note: Type assertion via unknown is needed because @augmentcode/auggie-sdk
-   * may not be fully aligned with the latest AI SDK LanguageModelV1 interface.
+   * Uses doStream directly to avoid AI SDK version conflicts.
    */
   async *streamCompletion(
-    messages: CoreMessage[],
+    messages: readonly ChatMessage[],
     modelName: string
-  ): AsyncGenerator<string, void, unknown> {
+  ): AsyncGenerator<string, void, undefined> {
     const model = this.createModel(modelName);
-    const { textStream } = streamText({
-      model: model as unknown as LanguageModel,
-      messages,
-    });
+    const prompt = messages.map(toLanguageModelMessage);
 
-    for await (const chunk of textStream) {
-      yield chunk;
+    // Call doStream directly on the language model
+    const { stream } = await model.doStream({ prompt });
+
+    const reader = stream.getReader();
+
+    try {
+      let result = await reader.read();
+      while (!result.done) {
+        // Only yield text deltas
+        if (result.value.type === 'text-delta') {
+          yield result.value.delta;
+        }
+        result = await reader.read();
+      }
+    } finally {
+      reader.releaseLock();
     }
   }
 
@@ -118,9 +169,7 @@ let serviceInstance: AugmentService | null = null;
  * Get or create the AugmentService singleton
  */
 export function getAugmentService(): AugmentService {
-  if (!serviceInstance) {
-    serviceInstance = new AugmentService();
-  }
+  serviceInstance ??= new AugmentService();
   return serviceInstance;
 }
 
@@ -130,8 +179,8 @@ export function getAugmentService(): AugmentService {
 export async function initializeAugment(): Promise<void> {
   const service = getAugmentService();
   await service.initialize(
-    process.env['AUGMENT_API_TOKEN'],
-    process.env['AUGMENT_API_URL']
+    process.env.AUGMENT_API_TOKEN,
+    process.env.AUGMENT_API_URL
   );
 }
 
