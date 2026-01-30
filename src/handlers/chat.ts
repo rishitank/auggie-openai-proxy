@@ -9,8 +9,8 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
-import { getAugmentService } from '../services/augment.js';
-import { getContextService } from '../services/context.js';
+import { getAugmentService } from '@/services/augment';
+import { getContextService } from '@/services/context';
 import {
   MessageRole,
   FinishReason,
@@ -19,7 +19,7 @@ import {
   type ChatCompletionResponse,
   type StreamChunkResponse,
   type TokenUsage,
-} from '../types/index.js';
+} from '@/types';
 
 /** Message format for the service */
 interface ChatMessage {
