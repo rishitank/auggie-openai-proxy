@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-01-30
+## [1.0.0] - 2026-01-30
 
 Initial release of the Auggie OpenAI Proxy.
 
@@ -26,7 +26,7 @@ Initial release of the Auggie OpenAI Proxy.
 - TypeScript with path aliases (`@config`, `@types`, `@services/*`, etc.)
 - Express v5 with Zod validation
 - ESLint 9 with strict TypeScript rules
-- Vitest for testing
+- Vitest for testing with 80%+ coverage
 - tsup bundler for production builds
 - CI/CD automation with GitHub Actions
 - Conventional commits with commitlint + husky
