@@ -5,58 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [1.4.0] - 2026-01-30
+
+Initial release of the Auggie OpenAI Proxy.
 
 ### Added
 
+- OpenAI-compatible API proxy using `@augmentcode/auggie-sdk`
+- Chat completions endpoint (`POST /v1/chat/completions`)
+- Models listing endpoint (`GET /v1/models`)
+- Health check endpoint (`GET /health`)
 - Named webhooks system with per-webhook configuration
 - Support for multiple LLM backends (Augment, OpenAI, Ollama)
 - Multiple payload format support (IFTTT, Zapier, Make, generic)
 - `GET /webhooks` endpoint to list configured webhooks
 - `POST /webhook/:name` endpoint for named webhook calls
-- Zod validation with `.refine()` for webhook payloads
-- 60s timeout for OpenAI API calls
-
-### Changed
-
-- Replaced IFTTT-specific handler with generic webhook handler
-- Webhooks now validated through `safeParse()` with error logging
-
-## [1.3.0] - 2026-01-29
-
-### Added
-
-- Context enhancement feature using DirectContext
-- Automatic codebase indexing for prompt enrichment
-- TypeScript path aliases (`@config`, `@types`, `@services/*`, etc.)
-- tsup bundler for production builds
-
-### Changed
-
-- Modernized codebase with Express v5
-- Updated to Node.js 25
-
-## [1.2.0] - 2026-01-28
-
-### Added
-
+- Context enhancement using DirectContext for codebase-aware responses
+- TypeScript with path aliases (`@config`, `@types`, `@services/*`, etc.)
+- Express v5 with Zod validation
 - ESLint 9 with strict TypeScript rules
 - Vitest for testing
-- TypeScript enums for type safety
-
-## [1.1.0] - 2026-01-27
-
-### Added
-
-- Initial OpenAI-compatible proxy implementation
-- Chat completions endpoint
-- Models listing endpoint
-- Health check endpoint
-
-## [1.0.0] - 2026-01-26
-
-### Added
-
-- Initial release
-- Basic Express.js server
-- Auggie SDK integration
+- tsup bundler for production builds
+- CI/CD automation with GitHub Actions
+- Conventional commits with commitlint + husky
+- Automated releases with release-please
+- Docker support with GHCR publishing
+- Security scanning (npm audit, CodeQL, dependency review)
+- Dependabot for automated dependency updates
