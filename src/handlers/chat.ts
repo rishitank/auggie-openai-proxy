@@ -1,77 +1,77 @@
 /**
  * Chat Completions Handler
- * 
- * Implements OpenAI-compatible /v1/chat/completions endpoint
- * using the Augment SDK.
+ *
+ * Single Responsibility: Handles HTTP request/response for chat completions
+ * Uses Zod for runtime validation (fail fast)
+ * Delegates business logic to AugmentService
  */
 
-import { Request, Response, NextFunction } from 'express';
-import { generateChatCompletion, streamChatCompletion } from '../services/augment.js';
-import { CoreMessage } from 'ai';
-import { randomUUID } from 'crypto';
+import type { Request, Response, NextFunction } from 'express';
+import type { CoreMessage } from 'ai';
+import { randomUUID } from 'node:crypto';
+import { getAugmentService } from '../services/augment.js';
+import {
+  ChatCompletionRequestSchema,
+  type OpenAIMessage,
+  type ChatCompletionResponse,
+  type StreamChunkResponse,
+  type TokenUsage,
+} from '../types/index.js';
 
-interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+// =============================================================================
+// Response Builders (DRY - reusable response construction)
+// =============================================================================
 
-interface ChatCompletionRequest {
-  model: string;
-  messages: OpenAIMessage[];
-  stream?: boolean;
-  temperature?: number;
-  max_tokens?: number;
-}
+/** Generate a unique completion ID */
+const generateCompletionId = (): string => `chatcmpl-${randomUUID()}`;
+
+/** Get current Unix timestamp */
+const getCurrentTimestamp = (): number => Math.floor(Date.now() / 1000);
 
 /**
- * Convert OpenAI message format to Vercel AI SDK format
+ * Build a complete chat completion response
  */
-function convertMessages(messages: OpenAIMessage[]): CoreMessage[] {
-  return messages.map((msg) => ({
-    role: msg.role,
-    content: msg.content,
-  }));
-}
-
-/**
- * Create OpenAI-compatible response format
- */
-function createCompletionResponse(
+function buildCompletionResponse(
   text: string,
   model: string,
   usage?: { promptTokens: number; completionTokens: number }
-) {
+): ChatCompletionResponse {
+  const tokenUsage: TokenUsage | undefined = usage
+    ? {
+        prompt_tokens: usage.promptTokens,
+        completion_tokens: usage.completionTokens,
+        total_tokens: usage.promptTokens + usage.completionTokens,
+      }
+    : undefined;
+
   return {
-    id: `chatcmpl-${randomUUID()}`,
+    id: generateCompletionId(),
     object: 'chat.completion',
-    created: Math.floor(Date.now() / 1000),
+    created: getCurrentTimestamp(),
     model,
     choices: [
       {
         index: 0,
-        message: {
-          role: 'assistant',
-          content: text,
-        },
+        message: { role: 'assistant', content: text },
         finish_reason: 'stop',
       },
     ],
-    usage: usage ? {
-      prompt_tokens: usage.promptTokens,
-      completion_tokens: usage.completionTokens,
-      total_tokens: usage.promptTokens + usage.completionTokens,
-    } : undefined,
+    usage: tokenUsage,
   };
 }
 
 /**
- * Create streaming SSE chunk
+ * Build a streaming SSE chunk
  */
-function createStreamChunk(content: string, model: string, isLast: boolean = false) {
-  const chunk = {
-    id: `chatcmpl-${randomUUID()}`,
+function buildStreamChunk(
+  content: string,
+  model: string,
+  isLast = false
+): StreamChunkResponse {
+  return {
+    id: generateCompletionId(),
     object: 'chat.completion.chunk',
-    created: Math.floor(Date.now() / 1000),
+    created: getCurrentTimestamp(),
     model,
     choices: [
       {
@@ -81,56 +81,77 @@ function createStreamChunk(content: string, model: string, isLast: boolean = fal
       },
     ],
   };
-  return `data: ${JSON.stringify(chunk)}\n\n`;
 }
 
+/** Serialize chunk to SSE format */
+const toSSE = (chunk: StreamChunkResponse): string =>
+  `data: ${JSON.stringify(chunk)}\n\n`;
+
+// =============================================================================
+// Message Conversion
+// =============================================================================
+
 /**
- * Non-streaming chat completion handler
+ * Convert OpenAI messages to Vercel AI SDK CoreMessage format
  */
-export function createChatCompletionHandler() {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const body = req.body as ChatCompletionRequest;
-      const { model, messages, stream } = body;
+function toCoreMesages(messages: readonly OpenAIMessage[]): CoreMessage[] {
+  return messages.map((msg) => ({ role: msg.role, content: msg.content }));
+}
 
-      if (!messages || !Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({
-          error: { message: 'messages is required and must be a non-empty array', type: 'invalid_request_error' },
-        });
-      }
+// =============================================================================
+// Request Handler
+// =============================================================================
 
-      const coreMessages = convertMessages(messages);
-      const modelName = model || 'claude-sonnet-4-5';
-
-      console.log(`[Chat] Model: ${modelName}, Messages: ${messages.length}, Stream: ${stream}`);
-
-      if (stream) {
-        // Streaming response
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-
-        for await (const chunk of streamChatCompletion(coreMessages, modelName)) {
-          res.write(createStreamChunk(chunk, modelName));
-        }
-
-        res.write(createStreamChunk('', modelName, true));
-        res.write('data: [DONE]\n\n');
-        res.end();
-      } else {
-        // Non-streaming response
-        const result = await generateChatCompletion(coreMessages, modelName);
-        res.json(createCompletionResponse(result.text, modelName, result.usage));
-      }
-    } catch (error) {
-      console.error('[Chat] Error:', error);
-      next(error);
+/**
+ * Handle chat completion requests (streaming and non-streaming)
+ */
+export async function handleChatCompletion(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    // Validate request body with Zod
+    const parseResult = ChatCompletionRequestSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: {
+          message: parseResult.error.errors[0]?.message ?? 'Invalid request',
+          type: 'invalid_request_error',
+        },
+      });
+      return;
     }
-  };
-}
 
-/**
- * Alias for streaming handler
- */
-export const createStreamingHandler = createChatCompletionHandler;
+    const { model, messages, stream } = parseResult.data;
+    const coreMessages = toCoreMesages(messages);
+    const service = getAugmentService();
+
+    console.log(`[Chat] Model: ${model}, Messages: ${messages.length}, Stream: ${stream}`);
+
+    if (stream) {
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      // Stream chunks
+      for await (const chunk of service.streamCompletion(coreMessages, model)) {
+        res.write(toSSE(buildStreamChunk(chunk, model)));
+      }
+
+      // Send final chunk and done signal
+      res.write(toSSE(buildStreamChunk('', model, true)));
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } else {
+      // Non-streaming response
+      const result = await service.generateCompletion(coreMessages, model);
+      res.json(buildCompletionResponse(result.text, model, result.usage));
+    }
+  } catch (error) {
+    console.error('[Chat] Error:', error);
+    next(error);
+  }
+}
 

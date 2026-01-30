@@ -1,118 +1,124 @@
 /**
  * Augment SDK Service
- * 
- * Wraps the @augmentcode/auggie-sdk to provide:
- * - Language model access via AugmentLanguageModel
- * - Context Engine for enhanced responses
- * - Credential management
+ *
+ * Single Responsibility: Manages Augment SDK interactions
+ * Open/Closed: Extensible via AugmentService class, closed for modification
+ * Dependency Inversion: Depends on abstractions (interfaces), not concretions
  */
 
 import { AugmentLanguageModel, resolveAugmentCredentials } from '@augmentcode/auggie-sdk';
-import { generateText, streamText, CoreMessage } from 'ai';
-
-interface AugmentCredentials {
-  apiKey: string;
-  apiUrl: string;
-}
-
-let credentials: AugmentCredentials | null = null;
-let model: AugmentLanguageModel | null = null;
+import { generateText, streamText, type CoreMessage } from 'ai';
+import type { AugmentCredentials, ChatCompletionResult } from '../types/index.js';
+import { AVAILABLE_MODELS } from '../config.js';
 
 /**
- * Initialize the Augment SDK with credentials
+ * Service class for Augment SDK operations
+ * Encapsulates all Augment-related functionality
  */
-export async function initializeAugment(): Promise<void> {
-  // Try environment variables first
-  if (process.env.AUGMENT_API_TOKEN && process.env.AUGMENT_API_URL) {
-    credentials = {
-      apiKey: process.env.AUGMENT_API_TOKEN,
-      apiUrl: process.env.AUGMENT_API_URL,
-    };
-    console.log('📝 Using credentials from environment variables');
-  } else {
-    // Fall back to resolving from session file
+export class AugmentService {
+  private credentials: AugmentCredentials | null = null;
+
+  /**
+   * Initialize the service with credentials
+   * Tries environment variables first, then falls back to session file
+   */
+  async initialize(envToken?: string, envUrl?: string): Promise<void> {
+    if (envToken && envUrl) {
+      this.credentials = { apiKey: envToken, apiUrl: envUrl };
+      console.log('📝 Using credentials from environment variables');
+      return;
+    }
+
     try {
       const resolved = await resolveAugmentCredentials();
-      credentials = {
-        apiKey: resolved.apiKey,
-        apiUrl: resolved.apiUrl,
-      };
+      this.credentials = { apiKey: resolved.apiKey, apiUrl: resolved.apiUrl };
       console.log('📝 Using credentials from session file');
-    } catch (error) {
+    } catch {
       throw new Error(
         'Failed to resolve Augment credentials. Set AUGMENT_API_TOKEN and AUGMENT_API_URL or run `auggie login`'
       );
     }
   }
 
-  // Create default model
-  model = new AugmentLanguageModel('claude-sonnet-4-5', credentials);
-}
-
-/**
- * Get or create an AugmentLanguageModel for the specified model name
- */
-export function getModel(modelName: string = 'claude-sonnet-4-5'): AugmentLanguageModel {
-  if (!credentials) {
-    throw new Error('Augment not initialized. Call initializeAugment() first.');
+  /**
+   * Check if service is initialized
+   */
+  get isInitialized(): boolean {
+    return this.credentials !== null;
   }
-  return new AugmentLanguageModel(modelName, credentials);
-}
 
-/**
- * Generate a chat completion (non-streaming)
- */
-export async function generateChatCompletion(
-  messages: CoreMessage[],
-  modelName: string = 'claude-sonnet-4-5'
-): Promise<{ text: string; usage?: { promptTokens: number; completionTokens: number } }> {
-  const llm = getModel(modelName);
-  
-  const result = await generateText({
-    model: llm,
-    messages,
-  });
+  /**
+   * Create a language model instance for the specified model name
+   */
+  private createModel(modelName: string): AugmentLanguageModel {
+    if (!this.credentials) {
+      throw new Error('AugmentService not initialized. Call initialize() first.');
+    }
+    return new AugmentLanguageModel(modelName, this.credentials);
+  }
 
-  return {
-    text: result.text,
-    usage: result.usage ? {
-      promptTokens: result.usage.promptTokens,
-      completionTokens: result.usage.completionTokens,
-    } : undefined,
-  };
-}
+  /**
+   * Generate a chat completion (non-streaming)
+   */
+  async generateCompletion(
+    messages: CoreMessage[],
+    modelName: string
+  ): Promise<ChatCompletionResult> {
+    const model = this.createModel(modelName);
+    const result = await generateText({ model, messages });
 
-/**
- * Stream a chat completion
- */
-export async function* streamChatCompletion(
-  messages: CoreMessage[],
-  modelName: string = 'claude-sonnet-4-5'
-): AsyncGenerator<string, void, unknown> {
-  const llm = getModel(modelName);
-  
-  const { textStream } = await streamText({
-    model: llm,
-    messages,
-  });
+    return {
+      text: result.text,
+      usage: result.usage
+        ? { promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens }
+        : undefined,
+    };
+  }
 
-  for await (const chunk of textStream) {
-    yield chunk;
+  /**
+   * Stream a chat completion
+   */
+  async *streamCompletion(
+    messages: CoreMessage[],
+    modelName: string
+  ): AsyncGenerator<string, void, unknown> {
+    const model = this.createModel(modelName);
+    const { textStream } = streamText({ model, messages });
+
+    for await (const chunk of textStream) {
+      yield chunk;
+    }
+  }
+
+  /**
+   * Get list of available models
+   */
+  getAvailableModels(): readonly string[] {
+    return AVAILABLE_MODELS;
   }
 }
 
+// Singleton instance for the application
+let serviceInstance: AugmentService | null = null;
+
 /**
- * List available models
+ * Get or create the AugmentService singleton
  */
-export function getAvailableModels(): string[] {
-  return [
-    'claude-sonnet-4-5',
-    'claude-haiku-4.5',
-    'claude-opus-4',
-    'gpt-5',
-    'sonnet4',
-  ];
+export function getAugmentService(): AugmentService {
+  if (!serviceInstance) {
+    serviceInstance = new AugmentService();
+  }
+  return serviceInstance;
 }
 
-export { credentials };
+/**
+ * Initialize the Augment service (convenience function)
+ */
+export async function initializeAugment(): Promise<void> {
+  const service = getAugmentService();
+  await service.initialize(
+    process.env['AUGMENT_API_TOKEN'],
+    process.env['AUGMENT_API_URL']
+  );
+}
 

@@ -1,13 +1,23 @@
 /**
  * Express Middleware
+ *
+ * Single Responsibility: Each middleware handles one concern
+ * - requestLogger: Logging
+ * - errorHandler: Error formatting
  */
 
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
+import type { OpenAIErrorResponse } from '../types/index.js';
 
 /**
  * Request logging middleware
+ * Logs timestamp, method, and path for each request
  */
-export function requestLogger(req: Request, _res: Response, next: NextFunction) {
+export function requestLogger(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): void {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${req.method} ${req.path}`);
   next();
@@ -15,48 +25,24 @@ export function requestLogger(req: Request, _res: Response, next: NextFunction) 
 
 /**
  * Error handling middleware
+ * Formats errors in OpenAI-compatible format
  */
-export function errorHandler(
+export const errorHandler: ErrorRequestHandler = (
   error: Error,
   _req: Request,
   res: Response,
   _next: NextFunction
-) {
+): void => {
   console.error('[Error]', error);
 
-  // OpenAI-style error response
-  res.status(500).json({
+  const response: OpenAIErrorResponse = {
     error: {
       message: error.message || 'Internal server error',
       type: 'server_error',
       code: 'internal_error',
     },
-  });
-}
-
-/**
- * API key authentication middleware (optional)
- */
-export function apiKeyAuth(expectedKey?: string) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!expectedKey) {
-      return next(); // No auth required
-    }
-
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (token !== expectedKey) {
-      return res.status(401).json({
-        error: {
-          message: 'Invalid API key',
-          type: 'authentication_error',
-          code: 'invalid_api_key',
-        },
-      });
-    }
-
-    next();
   };
-}
+
+  res.status(500).json(response);
+};
 
