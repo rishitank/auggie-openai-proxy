@@ -6,5 +6,5 @@
 
 export { handleChatCompletion } from '@handlers/chat';
 export { handleModelsList } from '@handlers/models';
-export { handleIFTTTWebhook } from '@handlers/ifttt';
+export { handleWebhook, listWebhooks } from '@handlers/webhook';
 

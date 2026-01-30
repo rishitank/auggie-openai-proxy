@@ -29,7 +29,7 @@ Tech stack:
 ## 📦 Installation
 
 ```bash
-cd auggie-proxy
+cd auggie-openai-proxy
 
 # Use correct Node version (requires nvm)
 nvm use
@@ -159,7 +159,7 @@ response = llm.invoke("Hello!")
 
 ### [Moltbot](https://www.molt.bot/)
 
-[Moltbot](https://www.molt.bot/) is a personal AI assistant that supports OpenAI-compatible APIs. Add to your `moltbot.json` (or `clawdbot.json`):
+[Moltbot](https://www.molt.bot/) is a personal AI assistant that supports OpenAI-compatible APIs. Add to your `~/.clawdbot/clawdbot.json`:
 
 ```json
 {
@@ -195,24 +195,182 @@ response = llm.invoke("Hello!")
 | GET | `/health` | Health check |
 | GET | `/v1/models` | List available models |
 | POST | `/v1/chat/completions` | Chat completions (OpenAI format) |
-| POST | `/ifttt/webhook` | IFTTT webhook for Google Assistant |
+| GET | `/webhooks` | List all configured webhooks |
+| POST | `/webhook/:name` | Call a named webhook |
 
-## 🎙️ Google Assistant ([IFTTT](https://ifttt.com/))
+## 🔗 Named Webhooks
 
-Configure an [IFTTT](https://ifttt.com/) webhook to POST to `/ifttt/webhook` for [Google Assistant](https://assistant.google.com/) integration:
+Configure **multiple webhooks**, each with its own model, system prompt, and LLM backend. Perfect for:
+
+- **Different assistants** - Personal vs work, concise vs detailed
+- **Different models** - Fast (Haiku) vs powerful (Opus)
+- **Different backends** - Augment, OpenAI, Ollama, LM Studio
+
+### Configuration
+
+Set the `WEBHOOKS` environment variable as a JSON array:
+
+```bash
+WEBHOOKS='[
+  {
+    "name": "assistant",
+    "description": "Google Assistant via IFTTT",
+    "model": "claude-sonnet-4-5",
+    "systemPrompt": "You are a helpful personal assistant. Be concise."
+  },
+  {
+    "name": "coding",
+    "description": "Coding help with Opus",
+    "model": "claude-opus-4-5",
+    "systemPrompt": "You are an expert programmer. Provide code examples."
+  },
+  {
+    "name": "quick",
+    "description": "Fast responses with Haiku",
+    "model": "claude-haiku-4-5",
+    "systemPrompt": "Be extremely brief. One sentence max."
+  },
+  {
+    "name": "ollama",
+    "description": "Local Ollama for private queries",
+    "llmBaseUrl": "http://localhost:11434/v1",
+    "model": "llama2"
+  }
+]'
+```
+
+### Webhook Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `name` | ✅ | Unique identifier (used in URL) |
+| `description` | | Human-readable description |
+| `enabled` | | Enable/disable (default: true) |
+| `model` | | Model to use (default: `DEFAULT_MODEL`) |
+| `systemPrompt` | | System prompt for this webhook |
+| `llmBaseUrl` | | LLM endpoint (default: this proxy) |
+| `llmApiKey` | | API key for LLM (default: "not-needed") |
+
+### Supported Payload Formats
+
+All webhooks accept multiple payload formats:
+
+| Source | Payload Format |
+|--------|----------------|
+| [IFTTT](https://ifttt.com/) | `{ "value1": "...", "value2": "text" }` |
+| [Zapier](https://zapier.com/) | `{ "message": "text" }` or `{ "query": "text" }` |
+| [Make](https://www.make.com/) | `{ "text": "..." }` or `{ "prompt": "..." }` |
+| Generic | `{ "text": "...", "model": "...", "system_prompt": "..." }` |
+
+The webhook tries these fields in order: `text`, `prompt`, `message`, `query`, `content`, `input`, `value2`, `value1`.
+
+### List Webhooks
+
+```bash
+curl https://your-server.com/webhooks
+```
+
+Response:
+```json
+{
+  "count": 4,
+  "webhooks": [
+    { "name": "assistant", "description": "Google Assistant via IFTTT", "enabled": true, "model": "claude-sonnet-4-5" },
+    { "name": "coding", "description": "Coding help with Opus", "enabled": true, "model": "claude-opus-4-5" },
+    { "name": "quick", "description": "Fast responses with Haiku", "enabled": true, "model": "claude-haiku-4-5" },
+    { "name": "ollama", "description": "Local Ollama for private queries", "enabled": true, "model": "llama2" }
+  ]
+}
+```
+
+### Call a Webhook
+
+```bash
+# Call the "assistant" webhook
+curl https://your-server.com/webhook/assistant \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "What time is it in Tokyo?" }'
+
+# Call the "coding" webhook
+curl https://your-server.com/webhook/coding \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "Write a Python function to reverse a string" }'
+
+# Override model in payload
+curl https://your-server.com/webhook/assistant \
+  -H "Content-Type: application/json" \
+  -d '{ "text": "Complex question", "model": "claude-opus-4-5" }'
+```
+
+## 🎙️ Google Assistant Setup
+
+Use [IFTTT](https://ifttt.com/) to connect [Google Assistant](https://assistant.google.com/) to a named webhook:
+
+### Step 1: Configure Webhook
+
+Add an "assistant" webhook to your `WEBHOOKS` config:
 
 ```json
-{ "value1": "command", "value2": "extracted text" }
+{
+  "name": "assistant",
+  "description": "Google Assistant",
+  "model": "claude-sonnet-4-5",
+  "systemPrompt": "You are a helpful personal assistant. Be concise and friendly."
+}
 ```
+
+### Step 2: Create IFTTT Applet
+
+1. Go to [IFTTT](https://ifttt.com/) and create a new Applet
+2. **If This**: Choose "Google Assistant" → "Say a phrase with a text ingredient"
+3. Set the phrase: "Ask AI $" (where $ is the text ingredient)
+4. **Then That**: Choose "Webhooks" → "Make a web request"
+
+### Step 3: Configure IFTTT Webhook
+
+| Field | Value |
+|-------|-------|
+| URL | `https://your-server.com/webhook/assistant` |
+| Method | `POST` |
+| Content Type | `application/json` |
+| Body | `{ "value1": "{{GoogleAssistant}}", "value2": "{{TextField}}" }` |
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "webhook": "assistant",
+  "model": "claude-sonnet-4-5",
+  "prompt": "What's the weather?",
+  "response": "I don't have access to real-time weather data..."
+}
+```
+
+## 📱 Other Automation Platforms
+
+### [Zapier](https://zapier.com/)
+
+1. Create a new Zap with any trigger
+2. Add "Webhooks by Zapier" action → "POST"
+3. URL: `https://your-server.com/webhook/assistant`
+4. Data: `{ "message": "Your prompt here" }`
+
+### [Make](https://www.make.com/) (Integromat)
+
+1. Create a scenario with any trigger
+2. Add HTTP module → "Make a request"
+3. URL: `https://your-server.com/webhook/coding`
+4. Body: `{ "text": "Your prompt here" }`
 
 ## 🐳 Docker
 
 ```bash
 # Build using Node version from .nvmrc
-docker build -t auggie-proxy --build-arg NODE_VERSION=$(cat .nvmrc) .
+docker build -t auggie-openai-proxy --build-arg NODE_VERSION=$(cat .nvmrc) .
 
 # Run
-docker run -p 3456:3456 -e AUGMENT_API_TOKEN=xxx auggie-proxy
+docker run -p 3456:3456 -e AUGMENT_API_TOKEN=xxx auggie-openai-proxy
 ```
 
 ## 📋 Available Models

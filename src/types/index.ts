@@ -46,13 +46,56 @@ export const ChatCompletionRequestSchema = z.object({
 });
 export type ChatCompletionRequest = z.infer<typeof ChatCompletionRequestSchema>;
 
-/** IFTTT webhook request body */
-export const IFTTTWebhookRequestSchema = z.object({
-  value1: z.string().optional(),
-  value2: z.string().optional(),
-  value3: z.string().optional(),
+/**
+ * Webhook request body
+ * Supports multiple formats from various automation platforms
+ */
+export const WebhookRequestSchema = z
+  .object({
+    // IFTTT format
+    value1: z.string().optional(),
+    value2: z.string().optional(),
+    value3: z.string().optional(),
+    // Zapier/Make format
+    message: z.string().optional(),
+    query: z.string().optional(),
+    // Generic format
+    prompt: z.string().optional(),
+    input: z.string().optional(),
+    content: z.string().optional(),
+    text: z.string().optional(),
+    // Optional overrides (can override webhook defaults)
+    model: z.string().optional(),
+    system_prompt: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      Boolean(data.text) ||
+      Boolean(data.prompt) ||
+      Boolean(data.message) ||
+      Boolean(data.query) ||
+      Boolean(data.content) ||
+      Boolean(data.input) ||
+      Boolean(data.value1) ||
+      Boolean(data.value2),
+    { message: 'At least one message field is required' }
+  );
+export type WebhookRequest = z.infer<typeof WebhookRequestSchema>;
+
+/**
+ * Named webhook configuration
+ */
+export const WebhookConfigSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  enabled: z.boolean().default(true),
+  // LLM settings
+  llmBaseUrl: z.string().optional(), // Defaults to this proxy
+  llmApiKey: z.string().default('not-needed'),
+  model: z.string().optional(), // Defaults to global defaultModel
+  systemPrompt: z.string().optional(),
 });
-export type IFTTTWebhookRequest = z.infer<typeof IFTTTWebhookRequestSchema>;
+export type WebhookConfig = z.infer<typeof WebhookConfigSchema>;
 
 // =============================================================================
 // Response Types
