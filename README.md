@@ -1,6 +1,6 @@
 # 🚀 Auggie OpenAI Proxy
 
-An OpenAI-compatible API proxy that exposes [Augment Code's](https://www.augmentcode.com/) AI capabilities through a standard OpenAI API interface. Use Augment's powerful models with **any OpenAI-compatible client**.
+An OpenAI-compatible API proxy that exposes [Augment Code's](https://www.augmentcode.com/) AI capabilities through a standard OpenAI API. Use Augment's powerful models with **any OpenAI-compatible client**.
 
 ## ✨ Features
 

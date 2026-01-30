@@ -109,7 +109,7 @@ export const handleWebhook = async (
     const model = body.model ?? webhook.model ?? config.defaultModel;
     const systemPrompt = body.system_prompt ?? webhook.systemPrompt;
 
-    console.log(`[Webhook:${webhookName}] Model: ${model}, Prompt: "${prompt.slice(0, 50)}..."`);
+    console.log(`[Webhook:${webhookName}] Model: ${model}, PromptLength: ${String(prompt.length)}`);
 
     // Build messages array
     const messages: { role: 'system' | 'user'; content: string }[] = [];

@@ -56,6 +56,7 @@ function parseWebhooksFromEnv(): z.infer<typeof WebhookConfigSchema>[] {
       return [];
     }
     // Validate each webhook through Zod to apply defaults and catch errors
+    const seen = new Set<string>();
     return parsed
       .map((item, index) => {
         const result = WebhookConfigSchema.safeParse(item);
@@ -68,7 +69,15 @@ function parseWebhooksFromEnv(): z.infer<typeof WebhookConfigSchema>[] {
         }
         return result.data;
       })
-      .filter((w): w is z.infer<typeof WebhookConfigSchema> => w !== null);
+      .filter((w): w is z.infer<typeof WebhookConfigSchema> => w !== null)
+      .filter((w) => {
+        if (seen.has(w.name)) {
+          console.warn(`[Config] Duplicate webhook name '${w.name}', skipping`);
+          return false;
+        }
+        seen.add(w.name);
+        return true;
+      });
   } catch {
     console.warn('[Config] Failed to parse WEBHOOKS JSON, ignoring');
     return [];

@@ -43,7 +43,7 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     service: 'auggie-openai-proxy',
-    version: '1.1.0',
+    version: '1.4.0',
     timestamp: new Date().toISOString(),
   });
 });
