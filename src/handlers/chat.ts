@@ -4,11 +4,13 @@
  * Single Responsibility: Handles HTTP request/response for chat completions
  * Uses Zod for runtime validation (fail fast)
  * Delegates business logic to AugmentService
+ * Optionally enhances prompts with codebase context
  */
 
 import type { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getAugmentService } from '../services/augment.js';
+import { getContextService } from '../services/context.js';
 import {
   ChatCompletionRequestSchema,
   type OpenAIMessage,
@@ -114,6 +116,40 @@ function toChatMessages(messages: readonly OpenAIMessage[]): ChatMessage[] {
 // =============================================================================
 
 /**
+ * Enhance messages with codebase context if available
+ * Only enhances the last user message
+ */
+async function enhanceMessagesWithContext(
+  messages: ChatMessage[]
+): Promise<ChatMessage[]> {
+  const contextService = getContextService();
+  if (!contextService.isReady()) {
+    return messages;
+  }
+
+  // Find the last user message to enhance
+  const lastUserIndex = messages.findLastIndex((m) => m.role === 'user');
+  if (lastUserIndex === -1) {
+    return messages;
+  }
+
+  const lastUserMessage = messages[lastUserIndex];
+  if (lastUserMessage === undefined) {
+    return messages;
+  }
+
+  const enhancedContent = await contextService.enhancePrompt(lastUserMessage.content);
+  if (enhancedContent === lastUserMessage.content) {
+    return messages;
+  }
+
+  console.log('[Chat] Enhanced message with codebase context');
+  const result = [...messages];
+  result[lastUserIndex] = { ...lastUserMessage, content: enhancedContent };
+  return result;
+}
+
+/**
  * Handle chat completion requests (streaming and non-streaming)
  */
 export async function handleChatCompletion(
@@ -135,7 +171,11 @@ export async function handleChatCompletion(
     }
 
     const { model, messages, stream } = parseResult.data;
-    const chatMessages = toChatMessages(messages);
+    const rawMessages = toChatMessages(messages);
+
+    // Enhance with codebase context if available
+    const chatMessages = await enhanceMessagesWithContext(rawMessages);
+
     const service = getAugmentService();
 
     console.log(`[Chat] Model: ${model}, Messages: ${String(messages.length)}, Stream: ${String(stream)}`);

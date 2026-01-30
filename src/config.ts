@@ -1,6 +1,6 @@
 /**
  * Application Configuration
- * 
+ *
  * Single Responsibility: Manages all configuration loading and validation
  * Uses environment variables with sensible defaults
  */
@@ -16,6 +16,12 @@ const ConfigSchema = z.object({
   }),
   defaultModel: z.string().default('claude-sonnet-4-5'),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  context: z.object({
+    enabled: z.coerce.boolean().default(false),
+    workspaceDir: z.string().optional(),
+    stateFile: z.string().optional(),
+    maxFileSize: z.coerce.number().int().positive().default(100 * 1024), // 100KB
+  }),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -33,6 +39,12 @@ export function loadConfig(): Config {
     },
     defaultModel: process.env.DEFAULT_MODEL,
     logLevel: process.env.LOG_LEVEL,
+    context: {
+      enabled: process.env.CONTEXT_ENABLED,
+      workspaceDir: process.env.CONTEXT_WORKSPACE_DIR,
+      stateFile: process.env.CONTEXT_STATE_FILE,
+      maxFileSize: process.env.CONTEXT_MAX_FILE_SIZE,
+    },
   });
 }
 

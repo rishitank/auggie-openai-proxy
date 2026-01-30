@@ -8,6 +8,7 @@
  * - Express.js for HTTP handling
  * - Zod for request validation
  * - AugmentService for AI operations
+ * - ContextService for codebase context enhancement
  *
  * Principles:
  * - SOLID: Single responsibility per module
@@ -18,6 +19,7 @@
 import express, { type Request, type Response } from 'express';
 import { loadConfig } from './config.js';
 import { initializeAugment } from './services/augment.js';
+import { initializeContextService, getContextService } from './services/context.js';
 import { handleChatCompletion, handleModelsList, handleIFTTTWebhook } from './handlers/index.js';
 import { errorHandler, requestLogger } from './middleware/index.js';
 
@@ -66,14 +68,29 @@ async function main(): Promise<void> {
     await initializeAugment();
     console.log('✅ Auggie SDK initialized');
 
+    // Initialize context service if enabled
+    console.log('🔍 Initializing context service...');
+    await initializeContextService({
+      enabled: config.context.enabled,
+      workspaceDir: config.context.workspaceDir,
+      stateFile: config.context.stateFile,
+      maxFileSize: config.context.maxFileSize,
+    });
+    const contextService = getContextService();
+    const contextStatus = contextService.isReady()
+      ? `✅ Context enabled (${String(contextService.getIndexedPaths().length)} files indexed)`
+      : '⏸️  Context disabled';
+    console.log(contextStatus);
+
     app.listen(config.port, config.host, () => {
-      console.log(`\n🎉 Auggie OpenAI Proxy v1.2.0`);
+      console.log(`\n🎉 Auggie OpenAI Proxy v1.3.0`);
       console.log(`   Running at http://${config.host}:${String(config.port)}`);
       console.log(`\n📡 Endpoints:`);
       console.log(`   GET  /health              - Health check`);
       console.log(`   GET  /v1/models           - List available models`);
       console.log(`   POST /v1/chat/completions - Chat completions`);
       console.log(`   POST /ifttt/webhook       - Google Assistant webhook`);
+      console.log(`\n🔧 Context Enhancement: ${contextService.isReady() ? 'ENABLED' : 'DISABLED'}`);
       console.log(`\n💡 Clawdbot config:`);
       console.log(`   baseUrl: "http://${config.host}:${String(config.port)}/v1"`);
       console.log(`   api: "openai-completions"\n`);
