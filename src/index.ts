@@ -17,6 +17,7 @@
  */
 
 import express, { type Request, type Response } from 'express';
+import packageJson from '../package.json' with { type: 'json' };
 import { loadConfig } from '@config';
 import { initializeAugment } from '@services/augment';
 import { initializeContextService, getContextService } from '@services/context';
@@ -43,7 +44,7 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     service: 'auggie-openai-proxy',
-    version: '1.4.0',
+    version: packageJson.version,
     timestamp: new Date().toISOString(),
   });
 });
@@ -84,7 +85,7 @@ async function main(): Promise<void> {
     console.log(contextStatus);
 
     app.listen(config.port, config.host, () => {
-      console.log(`\n🎉 Auggie OpenAI Proxy v1.4.0`);
+      console.log(`\n🎉 Auggie OpenAI Proxy v${packageJson.version}`);
       console.log(`   Running at http://${config.host}:${String(config.port)}`);
       console.log(`\n📡 Endpoints:`);
       console.log(`   GET  /health              - Health check`);

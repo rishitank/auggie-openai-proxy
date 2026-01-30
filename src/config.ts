@@ -6,17 +6,7 @@
  */
 
 import { z } from 'zod';
-
-/** Schema for a single named webhook */
-const WebhookConfigSchema = z.object({
-  name: z.string(),
-  description: z.string().optional(),
-  enabled: z.boolean().default(true),
-  llmBaseUrl: z.string().optional(),
-  llmApiKey: z.string().default('not-needed'),
-  model: z.string().optional(),
-  systemPrompt: z.string().optional(),
-});
+import { WebhookConfigSchema, type WebhookConfig } from '@types';
 
 const ConfigSchema = z.object({
   port: z.coerce.number().int().positive().default(3456),
@@ -36,7 +26,7 @@ const ConfigSchema = z.object({
   webhooks: z.array(WebhookConfigSchema).default([]),
 });
 
-export type WebhookConfig = z.infer<typeof WebhookConfigSchema>;
+export type { WebhookConfig };
 export type Config = z.infer<typeof ConfigSchema>;
 
 /**
