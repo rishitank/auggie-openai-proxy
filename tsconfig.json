@@ -8,13 +8,12 @@
     "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/config": ["src/config"],
-      "@/types": ["src/types"],
-      "@/types/*": ["src/types/*"],
-      "@/services/*": ["src/services/*"],
-      "@/handlers/*": ["src/handlers/*"],
-      "@/middleware/*": ["src/middleware/*"]
+      "@config": ["src/config"],
+      "@types": ["src/types"],
+      "@types/*": ["src/types/*"],
+      "@services/*": ["src/services/*"],
+      "@handlers/*": ["src/handlers/*"],
+      "@middleware/*": ["src/middleware/*"]
     },
     "strict": true,
     "strictNullChecks": true,

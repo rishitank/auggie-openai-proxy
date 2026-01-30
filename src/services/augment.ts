@@ -19,8 +19,8 @@ import {
   ContentType,
   type AugmentCredentials,
   type ChatCompletionResult,
-} from '@/types';
-import { AVAILABLE_MODELS } from '@/config';
+} from '@types';
+import { AVAILABLE_MODELS } from '@config';
 
 /** Message format compatible with Augment SDK */
 interface ChatMessage {

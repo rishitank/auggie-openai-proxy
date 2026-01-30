@@ -17,11 +17,12 @@
  */
 
 import express, { type Request, type Response } from 'express';
-import { loadConfig } from '@/config';
-import { initializeAugment } from '@/services/augment';
-import { initializeContextService, getContextService } from '@/services/context';
-import { handleChatCompletion, handleModelsList, handleIFTTTWebhook } from '@/handlers/index';
-import { errorHandler, requestLogger } from '@/middleware/index';
+import packageJson from '../package.json' with { type: 'json' };
+import { loadConfig } from '@config';
+import { initializeAugment } from '@services/augment';
+import { initializeContextService, getContextService } from '@services/context';
+import { handleChatCompletion, handleModelsList, handleWebhook, listWebhooks } from '@handlers/index';
+import { errorHandler, requestLogger } from '@middleware/index';
 
 // =============================================================================
 // Application Setup
@@ -43,7 +44,7 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'healthy',
     service: 'auggie-openai-proxy',
-    version: '1.1.0',
+    version: packageJson.version,
     timestamp: new Date().toISOString(),
   });
 });
@@ -52,8 +53,9 @@ app.get('/health', (_req: Request, res: Response) => {
 app.get('/v1/models', handleModelsList);
 app.post('/v1/chat/completions', handleChatCompletion);
 
-/** IFTTT webhook for Google Assistant */
-app.post('/ifttt/webhook', handleIFTTTWebhook);
+/** Named webhooks - each webhook has its own configuration */
+app.get('/webhooks', listWebhooks);
+app.post('/webhook/:name', handleWebhook);
 
 // Error handler (must be last)
 app.use(errorHandler);
@@ -83,17 +85,24 @@ async function main(): Promise<void> {
     console.log(contextStatus);
 
     app.listen(config.port, config.host, () => {
-      console.log(`\n🎉 Auggie OpenAI Proxy v1.3.0`);
+      console.log(`\n🎉 Auggie OpenAI Proxy v${packageJson.version}`);
       console.log(`   Running at http://${config.host}:${String(config.port)}`);
       console.log(`\n📡 Endpoints:`);
       console.log(`   GET  /health              - Health check`);
       console.log(`   GET  /v1/models           - List available models`);
       console.log(`   POST /v1/chat/completions - Chat completions`);
-      console.log(`   POST /ifttt/webhook       - Google Assistant webhook`);
+      console.log(`   GET  /webhooks            - List configured webhooks`);
+      console.log(`   POST /webhook/:name       - Call a named webhook`);
       console.log(`\n🔧 Context Enhancement: ${contextService.isReady() ? 'ENABLED' : 'DISABLED'}`);
-      console.log(`\n💡 Clawdbot config:`);
+      console.log(`\n🔗 Webhooks: ${String(config.webhooks.length)} configured`);
+      for (const wh of config.webhooks) {
+        const status = wh.enabled ? '✅' : '⏸️';
+        console.log(`   ${status} ${wh.name}${wh.description !== undefined ? ` - ${wh.description}` : ''}`);
+      }
+      console.log(`\n💡 Moltbot config:`);
       console.log(`   baseUrl: "http://${config.host}:${String(config.port)}/v1"`);
-      console.log(`   api: "openai-completions"\n`);
+      console.log(`   api: "openai-completions"`);
+      console.log(`   models: claude-sonnet-4-5, claude-opus-4-5, claude-haiku-4-5, gpt-5\n`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
