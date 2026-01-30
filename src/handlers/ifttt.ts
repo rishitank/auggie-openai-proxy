@@ -1,13 +1,13 @@
 /**
  * IFTTT Webhook Handler
- * 
+ *
  * Single Responsibility: Handles IFTTT webhooks for Google Assistant integration
  * KISS: Simple, direct implementation without mock request hacks
  */
 
 import type { Request, Response, NextFunction } from 'express';
 import { getAugmentService } from '../services/augment.js';
-import { IFTTTWebhookRequestSchema } from '../types/index.js';
+import { MessageRole, IFTTTWebhookRequestSchema } from '../types/index.js';
 
 /** Default model for IFTTT requests */
 const DEFAULT_MODEL = 'claude-sonnet-4-5';
@@ -15,11 +15,11 @@ const DEFAULT_MODEL = 'claude-sonnet-4-5';
 /**
  * Handle IFTTT webhook requests from Google Assistant
  */
-export async function handleIFTTTWebhook(
+export const handleIFTTTWebhook = async (
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> {
+): Promise<void> => {
   try {
     // Validate request body
     const parseResult = IFTTTWebhookRequestSchema.safeParse(req.body);
@@ -41,7 +41,7 @@ export async function handleIFTTTWebhook(
     // Process through Augment service directly (KISS - no mock request)
     const service = getAugmentService();
     const result = await service.generateCompletion(
-      [{ role: 'user', content: commandText }],
+      [{ role: MessageRole.User, content: commandText }],
       DEFAULT_MODEL
     );
 
@@ -55,5 +55,5 @@ export async function handleIFTTTWebhook(
     console.error('[IFTTT] Error:', error);
     next(error);
   }
-}
+};
 

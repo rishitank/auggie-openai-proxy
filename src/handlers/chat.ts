@@ -12,6 +12,8 @@ import { randomUUID } from 'node:crypto';
 import { getAugmentService } from '../services/augment.js';
 import { getContextService } from '../services/context.js';
 import {
+  MessageRole,
+  FinishReason,
   ChatCompletionRequestSchema,
   type OpenAIMessage,
   type ChatCompletionResponse,
@@ -21,7 +23,7 @@ import {
 
 /** Message format for the service */
 interface ChatMessage {
-  readonly role: 'system' | 'user' | 'assistant';
+  readonly role: MessageRole;
   readonly content: string;
 }
 
@@ -64,8 +66,8 @@ function buildCompletionResponse(
     choices: [
       {
         index: 0,
-        message: { role: 'assistant', content: text },
-        finish_reason: 'stop',
+        message: { role: MessageRole.Assistant, content: text },
+        finish_reason: FinishReason.Stop,
       },
     ],
     usage: tokenUsage,
@@ -89,7 +91,7 @@ function buildStreamChunk(
       {
         index: 0,
         delta: isLast ? {} : { content },
-        finish_reason: isLast ? 'stop' : null,
+        finish_reason: isLast ? FinishReason.Stop : null,
       },
     ],
   };
@@ -128,7 +130,7 @@ async function enhanceMessagesWithContext(
   }
 
   // Find the last user message to enhance
-  const lastUserIndex = messages.findLastIndex((m) => m.role === 'user');
+  const lastUserIndex = messages.findLastIndex((m) => m.role === MessageRole.User);
   if (lastUserIndex === -1) {
     return messages;
   }

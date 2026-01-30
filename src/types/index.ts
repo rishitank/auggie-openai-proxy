@@ -1,18 +1,33 @@
 /**
  * Type definitions for the Auggie OpenAI Proxy
- * 
+ *
  * Following Interface Segregation Principle (ISP) - small, focused interfaces
  */
 
 import { z } from 'zod';
 
 // =============================================================================
+// Enums
+// =============================================================================
+
+/** Message roles for chat completions */
+export enum MessageRole {
+  System = 'system',
+  User = 'user',
+  Assistant = 'assistant',
+}
+
+/** Content types for language model messages */
+export enum ContentType {
+  Text = 'text',
+}
+
+// =============================================================================
 // OpenAI API Types (Request/Response schemas)
 // =============================================================================
 
-/** OpenAI message role */
-export const MessageRoleSchema = z.enum(['system', 'user', 'assistant']);
-export type MessageRole = z.infer<typeof MessageRoleSchema>;
+/** OpenAI message role schema (for Zod validation) */
+export const MessageRoleSchema = z.nativeEnum(MessageRole);
 
 /** OpenAI chat message */
 export const OpenAIMessageSchema = z.object({
@@ -43,14 +58,20 @@ export type IFTTTWebhookRequest = z.infer<typeof IFTTTWebhookRequestSchema>;
 // Response Types
 // =============================================================================
 
+/** Finish reasons for completions */
+export enum FinishReason {
+  Stop = 'stop',
+  Length = 'length',
+}
+
 /** Chat completion choice */
 export interface ChatCompletionChoice {
   readonly index: number;
   readonly message: {
-    readonly role: 'assistant';
+    readonly role: MessageRole.Assistant;
     readonly content: string;
   };
-  readonly finish_reason: 'stop' | 'length' | null;
+  readonly finish_reason: FinishReason | null;
 }
 
 /** Token usage statistics */
@@ -79,7 +100,7 @@ export interface StreamDelta {
 export interface StreamChunkChoice {
   readonly index: number;
   readonly delta: StreamDelta;
-  readonly finish_reason: 'stop' | null;
+  readonly finish_reason: FinishReason.Stop | null;
 }
 
 /** Streaming chunk response */

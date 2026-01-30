@@ -14,34 +14,54 @@ import {
   resolveAugmentCredentials,
   type AugmentCredentials as SdkCredentials,
 } from '@augmentcode/auggie-sdk';
-import type { AugmentCredentials, ChatCompletionResult } from '../types/index.js';
+import {
+  MessageRole,
+  ContentType,
+  type AugmentCredentials,
+  type ChatCompletionResult,
+} from '../types/index.js';
 import { AVAILABLE_MODELS } from '../config.js';
 
 /** Message format compatible with Augment SDK */
 interface ChatMessage {
-  readonly role: 'system' | 'user' | 'assistant';
+  readonly role: MessageRole;
   readonly content: string;
 }
 
 /** LanguageModelV2 message types */
-interface SystemMessage { role: 'system'; content: string }
-interface UserMessage { role: 'user'; content: { type: 'text'; text: string }[] }
-interface AssistantMessage { role: 'assistant'; content: { type: 'text'; text: string }[] }
+interface SystemMessage {
+  role: MessageRole.System;
+  content: string;
+}
+interface UserMessage {
+  role: MessageRole.User;
+  content: { type: ContentType.Text; text: string }[];
+}
+interface AssistantMessage {
+  role: MessageRole.Assistant;
+  content: { type: ContentType.Text; text: string }[];
+}
 type LMV2Message = SystemMessage | UserMessage | AssistantMessage;
 
 /**
  * Convert a ChatMessage to the proper LanguageModelV2 message format
  */
-function toLanguageModelMessage(msg: ChatMessage): LMV2Message {
+const toLanguageModelMessage = (msg: ChatMessage): LMV2Message => {
   switch (msg.role) {
-    case 'system':
-      return { role: 'system', content: msg.content };
-    case 'user':
-      return { role: 'user', content: [{ type: 'text', text: msg.content }] };
-    case 'assistant':
-      return { role: 'assistant', content: [{ type: 'text', text: msg.content }] };
+    case MessageRole.System:
+      return { role: MessageRole.System, content: msg.content };
+    case MessageRole.User:
+      return {
+        role: MessageRole.User,
+        content: [{ type: ContentType.Text, text: msg.content }],
+      };
+    case MessageRole.Assistant:
+      return {
+        role: MessageRole.Assistant,
+        content: [{ type: ContentType.Text, text: msg.content }],
+      };
   }
-}
+};
 
 /**
  * Service class for Augment SDK operations
