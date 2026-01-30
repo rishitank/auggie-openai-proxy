@@ -9,7 +9,7 @@ An OpenAI-compatible API proxy that exposes [Augment Code's](https://www.augment
 - **Context Enhancement** - Automatically enrich prompts with codebase context
 - **Multiple Models** - Access Claude Sonnet/Haiku/Opus 4.5, GPT-5 (see [Available Models](#-available-models))
 - **Request Validation** - [Zod](https://zod.dev/) schemas for runtime type safety
-- **IFTTT Webhook** - [Google Assistant](https://assistant.google.com/) integration via [IFTTT](https://ifttt.com/)
+- **Named Webhooks** - Provider-agnostic webhooks for [IFTTT](https://ifttt.com/), [Zapier](https://zapier.com/), [Make](https://www.make.com/), and custom integrations
 
 ## 🏗️ Architecture
 
