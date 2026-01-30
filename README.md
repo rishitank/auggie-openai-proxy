@@ -241,26 +241,26 @@ WEBHOOKS='[
 
 ### Webhook Properties
 
-| Property | Required | Description |
-|----------|----------|-------------|
-| `name` | ✅ | Unique identifier (used in URL) |
-| `description` | | Human-readable description |
-| `enabled` | | Enable/disable (default: true) |
-| `model` | | Model to use (default: `DEFAULT_MODEL`) |
-| `systemPrompt` | | System prompt for this webhook |
-| `llmBaseUrl` | | LLM endpoint (default: this proxy) |
-| `llmApiKey` | | API key for LLM (default: "not-needed") |
+| Property       | Required | Description                              |
+| -------------- | -------- | ---------------------------------------- |
+| `name`         | ✅       | Unique identifier (used in URL)          |
+| `description`  |          | Human-readable description               |
+| `enabled`      |          | Enable/disable (default: true)           |
+| `model`        |          | Model to use (default: `DEFAULT_MODEL`)  |
+| `systemPrompt` |          | System prompt for this webhook           |
+| `llmBaseUrl`   |          | LLM endpoint (default: this proxy)       |
+| `llmApiKey`    |          | API key for LLM (default: "not-needed")  |
 
 ### Supported Payload Formats
 
 All webhooks accept multiple payload formats:
 
-| Source | Payload Format |
-|--------|----------------|
-| [IFTTT](https://ifttt.com/) | `{ "value1": "...", "value2": "text" }` |
-| [Zapier](https://zapier.com/) | `{ "message": "text" }` or `{ "query": "text" }` |
-| [Make](https://www.make.com/) | `{ "text": "..." }` or `{ "prompt": "..." }` |
-| Generic | `{ "text": "...", "model": "...", "system_prompt": "..." }` |
+| Source                       | Payload Format                                            |
+| ---------------------------- | --------------------------------------------------------- |
+| [IFTTT](https://ifttt.com/)  | `{ "value1": "...", "value2": "text" }`                   |
+| [Zapier](https://zapier.com/)| `{ "message": "text" }` or `{ "query": "text" }`          |
+| [Make](https://www.make.com/)| `{ "text": "..." }` or `{ "prompt": "..." }`              |
+| Generic                      | `{ "text": "...", "model": "...", "system_prompt": "..." }`|
 
 The webhook tries these fields in order: `text`, `prompt`, `message`, `query`, `content`, `input`, `value2`, `value1`.
 
