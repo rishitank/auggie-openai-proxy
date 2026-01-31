@@ -4,7 +4,8 @@
  * Verifies the /v1/models endpoint handler
  */
 
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
+import { createMockResponse, type MockResponse } from '../test-utils';
 import { handleModelsList } from './models';
 
 interface ModelsListResponse {
@@ -27,8 +28,7 @@ vi.mock('#services/augment', () => ({
 describe('handlers/models', () => {
   describe('handleModelsList', () => {
     let mockReq: Partial<Request>;
-    let mockRes: Partial<Response>;
-    let jsonMock: ReturnType<typeof vi.fn>;
+    let mockRes: MockResponse;
 
     function assertDefined<T>(value: T | undefined | null): asserts value is T {
       if (value === undefined || value === null) {
@@ -38,17 +38,14 @@ describe('handlers/models', () => {
 
     beforeEach(() => {
       mockReq = {};
-      jsonMock = vi.fn();
-      mockRes = {
-        json: jsonMock,
-      };
+      mockRes = createMockResponse();
     });
 
     it('should return list of models in OpenAI format', () => {
-      handleModelsList(mockReq as Request, mockRes as Response);
+      handleModelsList(mockReq as Request, mockRes.asResponse());
 
-      expect(jsonMock).toHaveBeenCalledTimes(1);
-      const calls = jsonMock.mock.calls;
+      expect(mockRes.json).toHaveBeenCalledTimes(1);
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       const firstCall = calls[0];
       assertDefined(firstCall);
@@ -59,9 +56,9 @@ describe('handlers/models', () => {
     });
 
     it('should return models with correct structure', () => {
-      handleModelsList(mockReq as Request, mockRes as Response);
+      handleModelsList(mockReq as Request, mockRes.asResponse());
 
-      const calls = jsonMock.mock.calls;
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       const firstCall = calls[0];
       assertDefined(firstCall);
@@ -76,9 +73,9 @@ describe('handlers/models', () => {
     });
 
     it('should include all available models', () => {
-      handleModelsList(mockReq as Request, mockRes as Response);
+      handleModelsList(mockReq as Request, mockRes.asResponse());
 
-      const calls = jsonMock.mock.calls;
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       const firstCall = calls[0];
       assertDefined(firstCall);

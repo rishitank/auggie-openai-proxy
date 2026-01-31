@@ -4,8 +4,9 @@
  * Verifies the webhook endpoint handlers
  */
 
-import type { Request, Response, NextFunction } from 'express';
+import type { Request } from 'express';
 import { handleWebhook, listWebhooks } from './webhook';
+import { createMockResponse, createMockNext, type MockResponse } from '../test-utils';
 
 // Type definitions for webhook responses
 interface WebhookInfo {
@@ -33,18 +34,18 @@ vi.mock('#config', () => ({
   })),
 }));
 
-// Mock OpenAI client
+// Mock OpenAI client - use a class for Vitest 4 constructor mock compatibility
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
+  default: class MockOpenAI {
+    chat = {
       completions: {
         create: vi.fn().mockResolvedValue({
           choices: [{ message: { content: 'Response from AI' } }],
           usage: { prompt_tokens: 5, completion_tokens: 10, total_tokens: 15 },
         }),
       },
-    },
-  })),
+    };
+  },
 }));
 
 describe('handlers/webhook', () => {
@@ -56,20 +57,18 @@ describe('handlers/webhook', () => {
 
   describe('listWebhooks', () => {
     let mockReq: Partial<Request>;
-    let mockRes: Partial<Response>;
-    let jsonMock: ReturnType<typeof vi.fn>;
+    let mockRes: MockResponse;
 
     beforeEach(() => {
       mockReq = {};
-      jsonMock = vi.fn();
-      mockRes = { json: jsonMock };
+      mockRes = createMockResponse();
     });
 
     it('should return list of configured webhooks', () => {
-      listWebhooks(mockReq as Request, mockRes as Response);
+      listWebhooks(mockReq as Request, mockRes.asResponse());
 
-      expect(jsonMock).toHaveBeenCalledTimes(1);
-      const calls = jsonMock.mock.calls;
+      expect(mockRes.json).toHaveBeenCalledTimes(1);
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       const firstCall = calls[0];
       assertDefined(firstCall);
@@ -80,9 +79,9 @@ describe('handlers/webhook', () => {
     });
 
     it('should include webhook details', () => {
-      listWebhooks(mockReq as Request, mockRes as Response);
+      listWebhooks(mockReq as Request, mockRes.asResponse());
 
-      const calls = jsonMock.mock.calls;
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       const firstCall = calls[0];
       assertDefined(firstCall);
@@ -98,9 +97,9 @@ describe('handlers/webhook', () => {
     });
 
     it('should indicate system prompt presence', () => {
-      listWebhooks(mockReq as Request, mockRes as Response);
+      listWebhooks(mockReq as Request, mockRes.asResponse());
 
-      const calls = jsonMock.mock.calls;
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       const firstCall = calls[0];
       assertDefined(firstCall);
@@ -119,16 +118,12 @@ describe('handlers/webhook', () => {
 
   describe('handleWebhook', () => {
     let mockReq: Partial<Request<{ name: string }>>;
-    let mockRes: Partial<Response>;
-    let mockNext: NextFunction;
-    let jsonMock: ReturnType<typeof vi.fn>;
-    let statusMock: ReturnType<typeof vi.fn>;
+    let mockRes: MockResponse;
+    let mockNext: ReturnType<typeof createMockNext>;
 
     beforeEach(() => {
-      jsonMock = vi.fn();
-      statusMock = vi.fn().mockReturnThis();
-      mockRes = { json: jsonMock, status: statusMock };
-      mockNext = vi.fn();
+      mockRes = createMockResponse();
+      mockNext = createMockNext();
     });
 
     it('should return 404 for unknown webhook', async () => {
@@ -136,12 +131,12 @@ describe('handlers/webhook', () => {
 
       await handleWebhook(
         mockReq as Request<{ name: string }>,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(statusMock).toHaveBeenCalledWith(404);
-      const calls = jsonMock.mock.calls;
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       const firstCall = calls[0];
       assertDefined(firstCall);
@@ -156,11 +151,11 @@ describe('handlers/webhook', () => {
 
       await handleWebhook(
         mockReq as Request<{ name: string }>,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(statusMock).toHaveBeenCalledWith(503);
+      expect(mockRes.status).toHaveBeenCalledWith(503);
     });
 
     it('should return 400 for invalid payload', async () => {
@@ -168,11 +163,11 @@ describe('handlers/webhook', () => {
 
       await handleWebhook(
         mockReq as Request<{ name: string }>,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(mockRes.status).toHaveBeenCalledWith(400);
     });
 
     it('should process valid webhook request', async () => {
@@ -180,11 +175,11 @@ describe('handlers/webhook', () => {
 
       await handleWebhook(
         mockReq as Request<{ name: string }>,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(jsonMock).toHaveBeenCalledWith(
+      expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
           webhook: 'test-webhook',
@@ -202,11 +197,11 @@ describe('handlers/webhook', () => {
 
         await handleWebhook(
           mockReq as Request<{ name: string }>,
-          mockRes as Response,
+          mockRes.asResponse(),
           mockNext
         );
 
-        expect(jsonMock).toHaveBeenCalledWith(
+        expect(mockRes.json).toHaveBeenCalledWith(
           expect.objectContaining({ success: true })
         );
       }

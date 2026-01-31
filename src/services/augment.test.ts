@@ -7,14 +7,14 @@
 import { AugmentService, getAugmentService } from './augment';
 import { MessageRole } from '#types';
 
-// Mock the Auggie SDK
+// Mock the Auggie SDK - use a class for Vitest 4 constructor mock compatibility
 vi.mock('@augmentcode/auggie-sdk', () => ({
-  AugmentLanguageModel: vi.fn().mockImplementation(() => ({
-    doGenerate: vi.fn().mockResolvedValue({
+  AugmentLanguageModel: class MockAugmentLanguageModel {
+    doGenerate = vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'Generated response' }],
       usage: { inputTokens: 10, outputTokens: 20 },
-    }),
-    doStream: vi.fn().mockResolvedValue({
+    });
+    doStream = vi.fn().mockResolvedValue({
       stream: {
         getReader: () => ({
           read: vi.fn()
@@ -24,8 +24,8 @@ vi.mock('@augmentcode/auggie-sdk', () => ({
           releaseLock: vi.fn(),
         }),
       },
-    }),
-  })),
+    });
+  },
   resolveAugmentCredentials: vi.fn().mockResolvedValue({
     apiKey: 'test-api-key',
     apiUrl: 'https://api.augment.com',
