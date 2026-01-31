@@ -313,177 +313,76 @@ describe('handlers/chat', () => {
       }
     );
 
-    // Unsupported parameters tests
+    // Unsupported parameters tests - these parameters are accepted but not used by Augment SDK
     describe('unsupported parameters', () => {
-      it('should accept request with temperature parameter', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
-            temperature: 0.7,
-          },
-        };
-
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
-
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
-
-      it('should accept request with top_p parameter', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
-            top_p: 0.9,
-          },
-        };
-
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
-
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
-
-      it('should accept request with presence_penalty parameter', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
-            presence_penalty: 0.5,
-          },
-        };
-
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
-
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
-
-      it('should accept request with frequency_penalty parameter', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
-            frequency_penalty: 0.5,
-          },
-        };
-
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
-
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
-
-      it('should accept request with logprobs parameter', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
-            logprobs: true,
-          },
-        };
-
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
-
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
-
-      it('should accept request with multiple unsupported parameters', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
+      const unsupportedParamCases = [
+        { name: 'temperature', bodyExtra: { temperature: 0.7 } },
+        { name: 'top_p', bodyExtra: { top_p: 0.9 } },
+        { name: 'presence_penalty', bodyExtra: { presence_penalty: 0.5 } },
+        { name: 'frequency_penalty', bodyExtra: { frequency_penalty: 0.5 } },
+        { name: 'logprobs', bodyExtra: { logprobs: true } },
+        {
+          name: 'multiple unsupported parameters',
+          bodyExtra: {
             temperature: 0.7,
             top_p: 0.9,
             presence_penalty: 0.5,
             frequency_penalty: 0.5,
             logprobs: true,
           },
-        };
+        },
+      ];
 
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
+      it.each(unsupportedParamCases)(
+        'should accept request with $name',
+        async ({ bodyExtra }) => {
+          mockReq = {
+            body: {
+              messages: [{ role: 'user', content: 'Hello' }],
+              ...bodyExtra,
+            },
+          };
 
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
+          await handleChatCompletion(
+            mockReq as Request,
+            mockRes.asResponse(),
+            mockNext
+          );
+
+          expect(mockRes.status).not.toHaveBeenCalledWith(400);
+          expect(mockRes.json).toHaveBeenCalledTimes(1);
+        }
+      );
     });
 
     // Token limit parameters tests
     describe('token limit parameters', () => {
-      it('should accept request with max_tokens parameter', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
-            max_tokens: 100,
-          },
-        };
+      const tokenLimitCases = [
+        { name: 'max_tokens', bodyExtra: { max_tokens: 100 } },
+        { name: 'max_completion_tokens', bodyExtra: { max_completion_tokens: 200 } },
+        { name: 'both max_tokens and max_completion_tokens', bodyExtra: { max_tokens: 100, max_completion_tokens: 200 } },
+      ];
 
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
+      it.each(tokenLimitCases)(
+        'should accept request with $name',
+        async ({ bodyExtra }) => {
+          mockReq = {
+            body: {
+              messages: [{ role: 'user', content: 'Hello' }],
+              ...bodyExtra,
+            },
+          };
 
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
+          await handleChatCompletion(
+            mockReq as Request,
+            mockRes.asResponse(),
+            mockNext
+          );
 
-      it('should accept request with max_completion_tokens parameter', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
-            max_completion_tokens: 200,
-          },
-        };
-
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
-
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
-
-      it('should accept request with both max_tokens and max_completion_tokens', async () => {
-        mockReq = {
-          body: {
-            messages: [{ role: 'user', content: 'Hello' }],
-            max_tokens: 100,
-            max_completion_tokens: 200,
-          },
-        };
-
-        await handleChatCompletion(
-          mockReq as Request,
-          mockRes.asResponse(),
-          mockNext
-        );
-
-        expect(mockRes.status).not.toHaveBeenCalledWith(400);
-        expect(mockRes.json).toHaveBeenCalledTimes(1);
-      });
+          expect(mockRes.status).not.toHaveBeenCalledWith(400);
+          expect(mockRes.json).toHaveBeenCalledTimes(1);
+        }
+      );
     });
 
     // Developer role tests
