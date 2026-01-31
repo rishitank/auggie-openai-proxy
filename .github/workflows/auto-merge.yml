@@ -12,11 +12,10 @@ jobs:
   auto-merge:
     name: Enable Auto-Merge
     runs-on: ubuntu-latest
-    # Don't run on draft PRs
-    if: github.event.pull_request.draft == false
+    # Don't run on draft PRs or forked PRs (GITHUB_TOKEN is read-only for forks)
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Enable auto-merge (squash)
         run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash --repo ${{ github.repository }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
