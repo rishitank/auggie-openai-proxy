@@ -16,7 +16,7 @@ const ConfigSchema = z.object({
   host: z.string().default('0.0.0.0'),
   augment: z.object({
     apiToken: z.string().optional(),
-    apiUrl: z.string().url().optional(),
+    apiUrl: z.url().optional(),
   }),
   defaultModel: z.string().default('claude-sonnet-4-5'),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -56,7 +56,7 @@ const parseWebhooksFromEnv = (): z.infer<typeof WebhookConfigSchema>[] => {
         if (!result.success) {
           console.warn(
             `[Config] Invalid webhook at index ${String(index)}, skipping:`,
-            result.error.errors
+            result.error.issues
           );
           return null;
         }
