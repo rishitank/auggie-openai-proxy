@@ -313,6 +313,122 @@ describe('handlers/chat', () => {
       }
     );
 
+    // Unsupported parameters tests - these parameters are accepted but not used by Augment SDK
+    describe('unsupported parameters', () => {
+      const unsupportedParamCases = [
+        { name: 'temperature', bodyExtra: { temperature: 0.7 } },
+        { name: 'top_p', bodyExtra: { top_p: 0.9 } },
+        { name: 'presence_penalty', bodyExtra: { presence_penalty: 0.5 } },
+        { name: 'frequency_penalty', bodyExtra: { frequency_penalty: 0.5 } },
+        { name: 'logprobs', bodyExtra: { logprobs: true } },
+        {
+          name: 'multiple unsupported parameters',
+          bodyExtra: {
+            temperature: 0.7,
+            top_p: 0.9,
+            presence_penalty: 0.5,
+            frequency_penalty: 0.5,
+            logprobs: true,
+          },
+        },
+      ];
+
+      it.each(unsupportedParamCases)(
+        'should accept request with $name',
+        async ({ bodyExtra }) => {
+          mockReq = {
+            body: {
+              messages: [{ role: 'user', content: 'Hello' }],
+              ...bodyExtra,
+            },
+          };
+
+          await handleChatCompletion(
+            mockReq as Request,
+            mockRes.asResponse(),
+            mockNext
+          );
+
+          expect(mockRes.status).not.toHaveBeenCalledWith(400);
+          expect(mockRes.json).toHaveBeenCalledTimes(1);
+        }
+      );
+    });
+
+    // Token limit parameters tests
+    describe('token limit parameters', () => {
+      const tokenLimitCases = [
+        { name: 'max_tokens', bodyExtra: { max_tokens: 100 } },
+        { name: 'max_completion_tokens', bodyExtra: { max_completion_tokens: 200 } },
+        { name: 'both max_tokens and max_completion_tokens', bodyExtra: { max_tokens: 100, max_completion_tokens: 200 } },
+      ];
+
+      it.each(tokenLimitCases)(
+        'should accept request with $name',
+        async ({ bodyExtra }) => {
+          mockReq = {
+            body: {
+              messages: [{ role: 'user', content: 'Hello' }],
+              ...bodyExtra,
+            },
+          };
+
+          await handleChatCompletion(
+            mockReq as Request,
+            mockRes.asResponse(),
+            mockNext
+          );
+
+          expect(mockRes.status).not.toHaveBeenCalledWith(400);
+          expect(mockRes.json).toHaveBeenCalledTimes(1);
+        }
+      );
+    });
+
+    // Developer role tests
+    describe('developer role', () => {
+      it('should handle developer role message', async () => {
+        mockReq = {
+          body: {
+            messages: [
+              { role: 'developer', content: 'You are a helpful assistant' },
+              { role: 'user', content: 'Hello' },
+            ],
+          },
+        };
+
+        await handleChatCompletion(
+          mockReq as Request,
+          mockRes.asResponse(),
+          mockNext
+        );
+
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledTimes(1);
+      });
+
+      it('should handle developer role with system role', async () => {
+        mockReq = {
+          body: {
+            messages: [
+              { role: 'system', content: 'System instructions' },
+              { role: 'developer', content: 'Developer instructions' },
+              { role: 'user', content: 'Hello' },
+            ],
+          },
+        };
+
+        await handleChatCompletion(
+          mockReq as Request,
+          mockRes.asResponse(),
+          mockNext
+        );
+
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledTimes(1);
+      });
+    });
+
     // Model aliasing tests
     describe('model aliasing', () => {
       const modelAliasCases = [
