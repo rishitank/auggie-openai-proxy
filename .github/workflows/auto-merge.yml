@@ -2,7 +2,7 @@ name: Auto-Merge
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [opened, synchronize, ready_for_review, reopened, closed]
 
 permissions:
   contents: write
@@ -12,10 +12,30 @@ jobs:
   auto-merge:
     name: Enable Auto-Merge
     runs-on: ubuntu-latest
-    # Don't run on draft PRs or forked PRs (GITHUB_TOKEN is read-only for forks)
-    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    # Don't run on draft PRs, forked PRs, or closed PRs
+    if: |
+      github.event.action != 'closed' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Enable auto-merge (squash)
         run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash --repo ${{ github.repository }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  delete-branch:
+    name: Delete Merged Branch
+    runs-on: ubuntu-latest
+    # Only run when PR is merged (not just closed) and not from a fork
+    if: |
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Delete head branch
+        run: |
+          gh api -X DELETE "repos/${REPO}/git/refs/heads/${BRANCH_NAME}" || echo "Branch already deleted or protected"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
