@@ -11,8 +11,8 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import OpenAI from 'openai';
-import { WebhookRequestSchema } from '@types';
-import { loadConfig, type WebhookConfig } from '@config';
+import { WebhookRequestSchema } from '#types';
+import { loadConfig, type WebhookConfig } from '#config';
 
 /** Cache of OpenAI clients per webhook (keyed by baseURL + apiKey) */
 const clientCache = new Map<string, OpenAI>();

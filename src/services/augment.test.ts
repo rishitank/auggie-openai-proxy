@@ -5,7 +5,7 @@
  */
 
 import { AugmentService, getAugmentService } from './augment';
-import { MessageRole } from '@types';
+import { MessageRole } from '#types';
 
 // Mock the Auggie SDK
 vi.mock('@augmentcode/auggie-sdk', () => ({
@@ -33,7 +33,7 @@ vi.mock('@augmentcode/auggie-sdk', () => ({
 }));
 
 // Mock config
-vi.mock('@config', () => ({
+vi.mock('#config', () => ({
   AVAILABLE_MODELS: ['claude-sonnet-4-5', 'gpt-5'],
 }));
 

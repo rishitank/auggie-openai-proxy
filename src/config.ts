@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { WebhookConfigSchema, type WebhookConfig } from '@types';
+import { WebhookConfigSchema, type WebhookConfig } from '#types';
 
 const ConfigSchema = z.object({
   port: z.coerce.number().int().positive().default(3456),

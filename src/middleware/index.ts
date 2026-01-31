@@ -7,7 +7,7 @@
  */
 
 import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
-import type { OpenAIErrorResponse } from '@types';
+import type { OpenAIErrorResponse } from '#types';
 
 /**
  * Request logging middleware

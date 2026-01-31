@@ -7,16 +7,7 @@
     "types": ["vitest/globals", "node"],
     "outDir": "./dist",
     "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "@config": ["src/config"],
-      "@version": ["src/version"],
-      "@types": ["src/types"],
-      "@types/*": ["src/types/*"],
-      "@services/*": ["src/services/*"],
-      "@handlers/*": ["src/handlers/*"],
-      "@middleware/*": ["src/middleware/*"]
-    },
+    "customConditions": ["auggie-dev"],
     "strict": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,

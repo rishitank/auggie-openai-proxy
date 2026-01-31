@@ -6,8 +6,8 @@
  */
 
 import type { Request, Response } from 'express';
-import { getAugmentService } from '@services/augment';
-import type { ModelsListResponse, ModelInfo } from '@types';
+import { getAugmentService } from '#services/augment';
+import type { ModelsListResponse, ModelInfo } from '#types';
 
 /** Get current Unix timestamp */
 const getCurrentTimestamp = (): number => Math.floor(Date.now() / 1000);

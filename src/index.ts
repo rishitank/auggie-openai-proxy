@@ -17,12 +17,12 @@
  */
 
 import express, { type Request, type Response } from 'express';
-import { loadConfig } from '@config';
-import { VERSION, NAME } from '@version';
-import { initializeAugment } from '@services/augment';
-import { initializeContextService, getContextService } from '@services/context';
-import { handleChatCompletion, handleModelsList, handleWebhook, listWebhooks } from '@handlers/index';
-import { errorHandler, requestLogger } from '@middleware/index';
+import { loadConfig } from '#config';
+import { VERSION, NAME } from '#version';
+import { initializeAugment } from '#services/augment';
+import { initializeContextService, getContextService } from '#services/context';
+import { handleChatCompletion, handleModelsList, handleWebhook, listWebhooks } from '#handlers/index';
+import { errorHandler, requestLogger } from '#middleware/index';
 
 // =============================================================================
 // Application Setup

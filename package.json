@@ -7,10 +7,40 @@
   "engines": {
     "node": ">=25.0.0"
   },
+  "imports": {
+    "#config": {
+      "auggie-dev": "./src/config.ts",
+      "default": "./dist/config.js"
+    },
+    "#version": {
+      "auggie-dev": "./src/version.ts",
+      "default": "./dist/version.js"
+    },
+    "#types": {
+      "auggie-dev": "./src/types/index.ts",
+      "default": "./dist/types/index.js"
+    },
+    "#types/*": {
+      "auggie-dev": "./src/types/*.ts",
+      "default": "./dist/types/*.js"
+    },
+    "#services/*": {
+      "auggie-dev": "./src/services/*.ts",
+      "default": "./dist/services/*.js"
+    },
+    "#handlers/*": {
+      "auggie-dev": "./src/handlers/*.ts",
+      "default": "./dist/handlers/*.js"
+    },
+    "#middleware/*": {
+      "auggie-dev": "./src/middleware/*.ts",
+      "default": "./dist/middleware/*.js"
+    }
+  },
   "scripts": {
     "build": "tsup",
     "start": "node dist/index.js",
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --experimental-transform-types --conditions=auggie-dev --watch src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -47,10 +77,12 @@
     "eslint-config-prettier": "^10.1.5",
     "husky": "^9.1.7",
     "tsup": "^8.5.1",
-    "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.34.0",
-    "vite-tsconfig-paths": "^6.0.5",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "jsondiffpatch": ">=0.7.2",
+    "ai": ">=5.0.52"
   }
 }
