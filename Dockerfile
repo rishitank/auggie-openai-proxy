@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Copy package files first for better layer caching
 COPY package*.json ./
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.build.json ./
 COPY tsup.config.ts ./
 
 # Install all dependencies (including dev for build)
@@ -18,7 +18,8 @@ RUN npm ci --ignore-scripts
 COPY src ./src
 
 # Build TypeScript and run type checking
-RUN npm run typecheck && npm run build
+# Use tsconfig.build.json which excludes vitest/globals types (not needed for production)
+RUN tsc --noEmit -p tsconfig.build.json && npm run build
 
 # Production stage - minimal runtime image
 ARG NODE_VERSION=25
