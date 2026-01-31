@@ -11,7 +11,8 @@ COPY tsconfig.json ./
 COPY tsup.config.ts ./
 
 # Install all dependencies (including dev for build)
-RUN npm ci
+# --ignore-scripts prevents husky from running during build
+RUN npm ci --ignore-scripts
 
 # Copy source code
 COPY src ./src
