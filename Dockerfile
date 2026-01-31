@@ -19,8 +19,8 @@ ENV PATH="/app/node_modules/.bin:$PATH"
 # Copy source code
 COPY src ./src
 
-# Build TypeScript (type checking is done in CI, not here)
-RUN tsup
+# Build TypeScript
+RUN npm run build
 
 # Production stage - minimal runtime image
 ARG NODE_VERSION=25
