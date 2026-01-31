@@ -19,9 +19,11 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Enable auto-merge (squash)
+        # Using PAT instead of GITHUB_TOKEN so that the merge triggers the 'closed' event
+        # for other workflows (GITHUB_TOKEN actions don't trigger subsequent workflows)
         run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash --repo ${{ github.repository }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_AUTO_MERGE }}
 
   delete-branch:
     name: Delete Merged Branch
