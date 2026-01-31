@@ -11,12 +11,12 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'ut
 const imports: Record<string, { 'auggie-dev': string; default: string }> = pkg.imports ?? {};
 
 // Build a custom resolver that emulates ESM-style subpath imports
-function matchIdentifier(id: string, pattern: string): { match: boolean; capture?: string } {
+const matchIdentifier = (id: string, pattern: string): { match: boolean; capture?: string } => {
   // Use replaceAll to handle all occurrences (satisfies CodeQL security check)
   const regexp = new RegExp(`^${pattern.replaceAll('*', '(.*)')}$`);
   const match = id.match(regexp);
   return { match: !!match, capture: match?.[1] };
-}
+};
 
 export default defineConfig({
   resolve: {

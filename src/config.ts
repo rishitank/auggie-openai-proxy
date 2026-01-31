@@ -36,7 +36,7 @@ export type Config = z.infer<typeof ConfigSchema>;
  * Parse WEBHOOKS JSON from environment variable
  * Format: [{"name": "assistant", "model": "claude-sonnet-4-5", "systemPrompt": "..."}]
  */
-function parseWebhooksFromEnv(): z.infer<typeof WebhookConfigSchema>[] {
+const parseWebhooksFromEnv = (): z.infer<typeof WebhookConfigSchema>[] => {
   const webhooksJson = process.env.WEBHOOKS;
   if (webhooksJson === undefined || webhooksJson === '') {
     return [];
@@ -75,13 +75,13 @@ function parseWebhooksFromEnv(): z.infer<typeof WebhookConfigSchema>[] {
     console.warn('[Config] Failed to parse WEBHOOKS JSON, ignoring');
     return [];
   }
-}
+};
 
 /**
  * Load and validate configuration from environment variables
  */
-export function loadConfig(): Config {
-  return ConfigSchema.parse({
+export const loadConfig = (): Config =>
+  ConfigSchema.parse({
     port: process.env.PORT,
     host: process.env.HOST,
     augment: {
@@ -98,13 +98,12 @@ export function loadConfig(): Config {
     },
     webhooks: parseWebhooksFromEnv(),
   });
-}
 
 /**
  * Validate environment and warn about potential issues
  * Returns array of warning messages (empty if all good)
  */
-export function validateEnvironment(): string[] {
+export const validateEnvironment = (): string[] => {
   const warnings: string[] = [];
 
   // Check for Augment credentials
@@ -134,7 +133,7 @@ export function validateEnvironment(): string[] {
   }
 
   return warnings;
-}
+};
 
 /**
  * Available models exposed by the proxy
@@ -194,12 +193,12 @@ export const MODEL_ALIASES: Record<string, AvailableModel> = {
  * Resolve a model name to an available model
  * Returns the model if it's available, resolves alias if exists, or undefined
  */
-export function resolveModelAlias(model: string): AvailableModel | undefined {
+export const resolveModelAlias = (model: string): AvailableModel | undefined => {
   // Check if it's already an available model
   if (AVAILABLE_MODELS.includes(model as AvailableModel)) {
     return model as AvailableModel;
   }
   // Check if it's an alias
   return MODEL_ALIASES[model];
-}
+};
 

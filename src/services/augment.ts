@@ -228,19 +228,19 @@ let serviceInstance: AugmentService | null = null;
 /**
  * Get or create the AugmentService singleton
  */
-export function getAugmentService(): AugmentService {
+export const getAugmentService = (): AugmentService => {
   serviceInstance ??= new AugmentService();
   return serviceInstance;
-}
+};
 
 /**
  * Initialize the Augment service (convenience function)
  */
-export async function initializeAugment(): Promise<void> {
+export const initializeAugment = async (): Promise<void> => {
   const service = getAugmentService();
   await service.initialize(
     process.env.AUGMENT_API_TOKEN,
     process.env.AUGMENT_API_URL
   );
-}
+};
 

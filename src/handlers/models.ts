@@ -15,19 +15,17 @@ const getCurrentTimestamp = (): number => Math.floor(Date.now() / 1000);
 /**
  * Build model info object
  */
-function buildModelInfo(id: string): ModelInfo {
-  return {
-    id,
-    object: 'model',
-    created: getCurrentTimestamp(),
-    owned_by: 'augment',
-  };
-}
+const buildModelInfo = (id: string): ModelInfo => ({
+  id,
+  object: 'model',
+  created: getCurrentTimestamp(),
+  owned_by: 'augment',
+});
 
 /**
  * Handle models list request
  */
-export function handleModelsList(_req: Request, res: Response): void {
+export const handleModelsList = (_req: Request, res: Response): void => {
   const service = getAugmentService();
   const models = service.getAvailableModels();
 
@@ -37,5 +35,5 @@ export function handleModelsList(_req: Request, res: Response): void {
   };
 
   res.json(response);
-}
+};
 

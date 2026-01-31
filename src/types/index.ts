@@ -325,17 +325,15 @@ export type OpenAIErrorType =
 /**
  * Create a standardized OpenAI-compatible error response
  */
-export function createErrorResponse(
+export const createErrorResponse = (
   message: string,
   type: OpenAIErrorType,
   code: string
-): OpenAIErrorResponse {
-  return {
-    error: {
-      message,
-      type,
-      code,
-    },
-  };
-}
+): OpenAIErrorResponse => ({
+  error: {
+    message,
+    type,
+    code,
+  },
+});
 

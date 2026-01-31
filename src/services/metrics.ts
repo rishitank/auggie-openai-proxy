@@ -8,9 +8,8 @@
  * Escapes backslash, double-quote, and newline characters.
  * @see https://prometheus.io/docs/instrumenting/exposition_formats/
  */
-function escapePromLabel(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
-}
+const escapePromLabel = (value: string): string =>
+  value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 
 /** Metrics data structure */
 interface Metrics {
@@ -33,7 +32,7 @@ const metrics: Metrics = {
 /**
  * Increment request counter for an endpoint
  */
-export function recordRequest(endpoint: string, statusCode: number): void {
+export const recordRequest = (endpoint: string, statusCode: number): void => {
   metrics.requestsTotal++;
   metrics.requestsByEndpoint[endpoint] = (metrics.requestsByEndpoint[endpoint] ?? 0) + 1;
   metrics.requestsByStatus[statusCode] = (metrics.requestsByStatus[statusCode] ?? 0) + 1;
@@ -41,12 +40,12 @@ export function recordRequest(endpoint: string, statusCode: number): void {
   if (statusCode >= 400) {
     metrics.errorsTotal++;
   }
-}
+};
 
 /**
  * Get metrics in Prometheus text format
  */
-export function getPrometheusMetrics(): string {
+export const getPrometheusMetrics = (): string => {
   const uptimeSeconds = Math.floor((Date.now() - metrics.startTime) / 1000);
 
   const lines: string[] = [
@@ -81,15 +80,13 @@ export function getPrometheusMetrics(): string {
   }
 
   return lines.join('\n') + '\n';
-}
+};
 
 /**
  * Get metrics as JSON (for debugging)
  */
-export function getMetricsJson(): Metrics & { uptimeSeconds: number } {
-  return {
-    ...metrics,
-    uptimeSeconds: Math.floor((Date.now() - metrics.startTime) / 1000),
-  };
-}
+export const getMetricsJson = (): Metrics & { uptimeSeconds: number } => ({
+  ...metrics,
+  uptimeSeconds: Math.floor((Date.now() - metrics.startTime) / 1000),
+});
 

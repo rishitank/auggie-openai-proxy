@@ -19,7 +19,7 @@ interface PackageJson {
  * Read and parse package.json
  * Uses import.meta.url to find the package.json relative to this file
  */
-function loadPackageJson(): PackageJson {
+const loadPackageJson = (): PackageJson => {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   // Navigate from src/ or dist/ to project root
   const packagePath = join(__dirname, '..', 'package.json');
@@ -31,15 +31,15 @@ function loadPackageJson(): PackageJson {
       `Failed to load package.json: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-}
+};
 
 // Cache the package.json data
 let cachedPackageJson: PackageJson | null = null;
 
-function getPackageJson(): PackageJson {
+const getPackageJson = (): PackageJson => {
   cachedPackageJson ??= loadPackageJson();
   return cachedPackageJson;
-}
+};
 
 /** Application version from package.json */
 export const VERSION: string = getPackageJson().version;
