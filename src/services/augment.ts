@@ -45,10 +45,12 @@ type LMV2Message = SystemMessage | UserMessage | AssistantMessage;
 
 /**
  * Convert a ChatMessage to the proper LanguageModelV2 message format
+ * Maps 'developer' role to 'system' for Augment SDK compatibility
  */
 const toLanguageModelMessage = (msg: ChatMessage): LMV2Message => {
   switch (msg.role) {
     case MessageRole.System:
+    case MessageRole.Developer: // OpenAI 'developer' role maps to 'system' for Augment SDK
       return { role: MessageRole.System, content: msg.content };
     case MessageRole.User:
       return {

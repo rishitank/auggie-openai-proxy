@@ -27,9 +27,10 @@ function assertDefined<T>(value: T | undefined | null, message = 'Value is undef
   }
 }
 
-// Mock the services
-vi.mock('@services/augment', () => ({
+// Mock the services - use #services path (subpath imports)
+vi.mock('#services/augment', () => ({
   getAugmentService: vi.fn(() => ({
+    isInitialized: true,
     generateCompletion: vi.fn().mockResolvedValue({
       text: 'Hello! How can I help you?',
       usage: { promptTokens: 10, completionTokens: 20 },
@@ -41,7 +42,7 @@ vi.mock('@services/augment', () => ({
   })),
 }));
 
-vi.mock('@services/context', () => ({
+vi.mock('#services/context', () => ({
   getContextService: vi.fn(() => ({
     isReady: vi.fn(() => false),
     enhancePrompt: vi.fn((msg: string) => msg),

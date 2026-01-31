@@ -15,6 +15,7 @@ export enum MessageRole {
   System = 'system',
   User = 'user',
   Assistant = 'assistant',
+  Developer = 'developer', // OpenAI-specific, maps to System for Augment SDK
 }
 
 /** Content types for language model messages */
@@ -29,12 +30,46 @@ export enum ContentType {
 /** OpenAI message role schema (for Zod validation) */
 export const MessageRoleSchema = z.nativeEnum(MessageRole);
 
-/** OpenAI chat message */
+/**
+ * Content can be either a string or an array of content parts
+ * OpenAI supports: { type: 'text', text: string } or { type: 'image_url', ... }
+ */
+const TextContentPartSchema = z.object({
+  type: z.literal('text'),
+  text: z.string(),
+});
+
+const ContentSchema = z.union([
+  z.string(),
+  z.array(TextContentPartSchema),
+]);
+
+/** OpenAI chat message - supports both string and array content */
 export const OpenAIMessageSchema = z.object({
   role: MessageRoleSchema,
-  content: z.string(),
+  content: ContentSchema,
 });
-export type OpenAIMessage = z.infer<typeof OpenAIMessageSchema>;
+
+/** Normalized message with string content */
+export interface OpenAIMessage {
+  readonly role: MessageRole;
+  readonly content: string;
+}
+
+/**
+ * Normalize OpenAI message content to string
+ * Handles both string content and array content formats
+ */
+export const normalizeMessageContent = (
+  msg: z.infer<typeof OpenAIMessageSchema>
+): OpenAIMessage => {
+  if (typeof msg.content === 'string') {
+    return { role: msg.role, content: msg.content };
+  }
+  // Extract text from content array (all parts are text type per schema)
+  const textParts = msg.content.map((part) => part.text);
+  return { role: msg.role, content: textParts.join('') };
+};
 
 /** Chat completion request body */
 export const ChatCompletionRequestSchema = z.object({

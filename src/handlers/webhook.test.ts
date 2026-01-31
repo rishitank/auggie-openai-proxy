@@ -20,8 +20,8 @@ interface ListWebhooksResponse {
   webhooks: WebhookInfo[];
 }
 
-// Mock the config module
-vi.mock('@config', () => ({
+// Mock the config module - use #config path (subpath imports)
+vi.mock('#config', () => ({
   loadConfig: vi.fn(() => ({
     port: 3456,
     defaultModel: 'claude-sonnet-4-5',

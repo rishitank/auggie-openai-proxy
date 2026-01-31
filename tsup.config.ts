@@ -9,5 +9,9 @@ export default defineConfig({
   target: 'node25',
   splitting: false,
   treeshake: true,
+  // Use auggie-dev condition for subpath imports resolution during build
+  esbuildOptions(options) {
+    options.conditions = ['auggie-dev'];
+  },
 });
 

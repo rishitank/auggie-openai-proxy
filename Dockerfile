@@ -8,6 +8,7 @@ WORKDIR /app
 # Copy package files first for better layer caching
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY tsup.config.ts ./
 
 # Install all dependencies (including dev for build)
 RUN npm ci
@@ -28,8 +29,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Copy package files and install production deps only
+# --ignore-scripts prevents husky from running (it's a dev dependency)
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist

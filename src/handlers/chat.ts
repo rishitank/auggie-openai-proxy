@@ -15,7 +15,7 @@ import {
   MessageRole,
   FinishReason,
   ChatCompletionRequestSchema,
-  type OpenAIMessage,
+  normalizeMessageContent,
   type ChatCompletionResponse,
   type StreamChunkResponse,
   type TokenUsage,
@@ -32,23 +32,19 @@ interface ChatMessage {
 // =============================================================================
 
 /** Generate a unique completion ID */
-function generateCompletionId(): string {
-  return `chatcmpl-${randomUUID()}`;
-}
+const generateCompletionId = (): string => `chatcmpl-${randomUUID()}`;
 
 /** Get current Unix timestamp */
-function getCurrentTimestamp(): number {
-  return Math.floor(Date.now() / 1000);
-}
+const getCurrentTimestamp = (): number => Math.floor(Date.now() / 1000);
 
 /**
  * Build a complete chat completion response
  */
-function buildCompletionResponse(
+const buildCompletionResponse = (
   text: string,
   model: string,
   usage?: { promptTokens: number; completionTokens: number }
-): ChatCompletionResponse {
+): ChatCompletionResponse => {
   const tokenUsage: TokenUsage | undefined =
     usage !== undefined
       ? {
@@ -72,35 +68,31 @@ function buildCompletionResponse(
     ],
     usage: tokenUsage,
   };
-}
+};
 
 /**
  * Build a streaming SSE chunk
  */
-function buildStreamChunk(
+const buildStreamChunk = (
   content: string,
   model: string,
   isLast = false
-): StreamChunkResponse {
-  return {
-    id: generateCompletionId(),
-    object: 'chat.completion.chunk',
-    created: getCurrentTimestamp(),
-    model,
-    choices: [
-      {
-        index: 0,
-        delta: isLast ? {} : { content },
-        finish_reason: isLast ? FinishReason.Stop : null,
-      },
-    ],
-  };
-}
+): StreamChunkResponse => ({
+  id: generateCompletionId(),
+  object: 'chat.completion.chunk',
+  created: getCurrentTimestamp(),
+  model,
+  choices: [
+    {
+      index: 0,
+      delta: isLast ? {} : { content },
+      finish_reason: isLast ? FinishReason.Stop : null,
+    },
+  ],
+});
 
 /** Serialize chunk to SSE format */
-function toSSE(chunk: StreamChunkResponse): string {
-  return `data: ${JSON.stringify(chunk)}\n\n`;
-}
+const toSSE = (chunk: StreamChunkResponse): string => `data: ${JSON.stringify(chunk)}\n\n`;
 
 // =============================================================================
 // Message Conversion
@@ -108,10 +100,15 @@ function toSSE(chunk: StreamChunkResponse): string {
 
 /**
  * Convert OpenAI messages to service format
+ * Normalizes array content to string format
  */
-function toChatMessages(messages: readonly OpenAIMessage[]): ChatMessage[] {
-  return messages.map((msg) => ({ role: msg.role, content: msg.content }));
-}
+const toChatMessages = (
+  messages: readonly { role: MessageRole; content: string | { type: 'text'; text: string }[] }[]
+): ChatMessage[] =>
+  messages.map((msg) => {
+    const normalized = normalizeMessageContent(msg);
+    return { role: normalized.role, content: normalized.content };
+  });
 
 // =============================================================================
 // Request Handler
@@ -121,9 +118,7 @@ function toChatMessages(messages: readonly OpenAIMessage[]): ChatMessage[] {
  * Enhance messages with codebase context if available
  * Only enhances the last user message
  */
-async function enhanceMessagesWithContext(
-  messages: ChatMessage[]
-): Promise<ChatMessage[]> {
+const enhanceMessagesWithContext = async (messages: ChatMessage[]): Promise<ChatMessage[]> => {
   const contextService = getContextService();
   if (!contextService.isReady()) {
     return messages;
@@ -149,16 +144,16 @@ async function enhanceMessagesWithContext(
   const result = [...messages];
   result[lastUserIndex] = { ...lastUserMessage, content: enhancedContent };
   return result;
-}
+};
 
 /**
  * Handle chat completion requests (streaming and non-streaming)
  */
-export async function handleChatCompletion(
+export const handleChatCompletion = async (
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> {
+): Promise<void> => {
   try {
     // Validate request body with Zod
     const parseResult = ChatCompletionRequestSchema.safeParse(req.body);
@@ -206,5 +201,5 @@ export async function handleChatCompletion(
     console.error('[Chat] Error:', error);
     next(error);
   }
-}
+};
 

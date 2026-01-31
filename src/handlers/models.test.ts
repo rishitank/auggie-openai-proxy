@@ -17,8 +17,8 @@ interface ModelsListResponse {
   }[];
 }
 
-// Mock the augment service
-vi.mock('@services/augment', () => ({
+// Mock the augment service - use #services path (subpath imports)
+vi.mock('#services/augment', () => ({
   getAugmentService: vi.fn(() => ({
     getAvailableModels: vi.fn(() => ['claude-sonnet-4-5', 'gpt-5']),
   })),
