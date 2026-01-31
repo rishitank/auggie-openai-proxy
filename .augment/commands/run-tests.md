@@ -5,6 +5,7 @@ Run the test suite with coverage reporting and provide a summary.
 ## Steps
 
 1. Run the full test suite with coverage:
+
    ```bash
    npm test -- --coverage
    ```

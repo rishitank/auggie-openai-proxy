@@ -66,14 +66,30 @@ export const requestLogger = (
  * Metrics recording middleware
  * Records request counts by endpoint and status code
  */
+/**
+ * Normalize a path for metrics to prevent high-cardinality issues.
+ * Replaces dynamic segments (UUIDs, numbers) with placeholders.
+ */
+const normalizePath = (path: string): string => {
+  return path
+    // Replace UUIDs (8-4-4-4-12 format)
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ':id')
+    // Replace numeric IDs
+    .replace(/\/\d+/g, '/:id')
+    // Bucket any remaining unknown paths to prevent explosion
+    || '/:unmatched';
+};
+
 export const metricsRecorder = (
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
   res.on('finish', () => {
-    const routePath = (req.route as { path?: string } | undefined)?.path ?? req.path;
-    const endpoint = `${req.method} ${routePath}`;
+    // Use route path if available (matched routes), otherwise normalize the raw path
+    const routePath = (req.route as { path?: string } | undefined)?.path;
+    const normalizedPath = routePath ?? normalizePath(req.path);
+    const endpoint = `${req.method} ${normalizedPath}`;
     recordRequest(endpoint, res.statusCode);
   });
   next();

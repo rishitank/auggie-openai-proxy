@@ -5,11 +5,13 @@ Generate release notes from commits since the last release.
 ## Steps
 
 1. Find the last release tag:
+
    ```bash
    git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0"
    ```
 
 2. Get commits since last release:
+
    ```bash
    git log <last-tag>..HEAD --oneline --no-merges
    ```

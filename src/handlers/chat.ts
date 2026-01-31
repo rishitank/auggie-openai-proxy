@@ -255,9 +255,10 @@ export const handleChatCompletion = async (
       console.log(`[Chat] Model alias: ${requestedModel} -> ${model}`);
     }
 
-    // Log user identifier if provided (for analytics/abuse detection)
+    // Log user identifier presence if provided (for analytics/abuse detection)
+    // Note: We don't log the actual user value to avoid PII leakage
     if (user !== undefined) {
-      console.log(`[Chat] User: ${user}`);
+      console.log('[Chat] User identifier provided');
     }
 
     // Log unsupported parameters that were provided
