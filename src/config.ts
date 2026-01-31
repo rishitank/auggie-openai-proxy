@@ -101,14 +101,18 @@ export function loadConfig(): Config {
  * Available models exposed by the proxy
  *
  * These are the model IDs for AugmentLanguageModel (AI SDK Provider).
+ * VERIFIED: Tested against Augment API on 2026-01-31
  * See: https://docs.augmentcode.com/models/available-models
+ *
+ * Note: Official docs mention GPT-5.1/GPT-5.2, but the API accepts 'gpt-5'
+ * which is mapped to the current GPT-5 version internally.
  */
 export const AVAILABLE_MODELS = [
   'claude-sonnet-4-5',   // Claude Sonnet 4.5 (default, best balance)
   'claude-haiku-4-5',    // Claude Haiku 4.5 (fast, lightweight)
   'claude-opus-4-5',     // Claude Opus 4.5 (most capable)
   'claude-sonnet-4',     // Claude Sonnet 4 (previous gen)
-  'gpt-5',               // OpenAI GPT-5
+  'gpt-5',               // OpenAI GPT-5 (maps to current version)
 ] as const;
 
 export type AvailableModel = (typeof AVAILABLE_MODELS)[number];

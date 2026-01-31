@@ -36,6 +36,23 @@
 Always run before committing:
 
 ```bash
-npm run check  # typecheck + lint
-npm run test   # run tests
+npm run check         # typecheck + lint + actionlint
+npm run test:coverage # tests with coverage (must pass 80% threshold)
 ```
+
+## CI Failure Debugging
+
+When CI fails on a PR:
+
+1. Use `/check-pr-build` command to analyze the failure
+2. Common failures:
+   - **Coverage threshold**: Add tests to reach 80% coverage
+   - **ESLint errors**: Fix type annotations, array syntax
+   - **TypeScript errors**: Check mock types, subpath imports
+3. Fix locally, commit, and push (never amend pushed commits)
+
+## GitHub Actions
+
+- Workflow files are in `.github/workflows/`
+- Use `actionlint` to validate workflows locally: `npm run lint:workflows`
+- Keep action versions up to date (e.g., `actions/checkout@v4`, `actions/upload-artifact@v6`)

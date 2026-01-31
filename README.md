@@ -179,6 +179,11 @@ response = llm.invoke("Hello!")
       "baseUrl": "http://localhost:3456/v1",
       "model": "claude-haiku-4-5"
     },
+    "augment/claude-sonnet-4": {
+      "api": "openai-completions",
+      "baseUrl": "http://localhost:3456/v1",
+      "model": "claude-sonnet-4"
+    },
     "augment/gpt-5": {
       "api": "openai-completions",
       "baseUrl": "http://localhost:3456/v1",
