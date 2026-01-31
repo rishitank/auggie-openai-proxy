@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": ["node"]
-  }
+  },
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
 
