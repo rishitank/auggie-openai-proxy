@@ -9,9 +9,10 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json tsup.config.ts ./
 
-# Install all dependencies (including dev for build)
+# Install all dependencies including devDependencies for build
+# --include=dev ensures devDeps are installed even if NODE_ENV=production (e.g., Coolify)
 # --ignore-scripts prevents husky from running during build
-RUN npm ci --ignore-scripts
+RUN npm ci --include=dev --ignore-scripts
 
 # Add node_modules/.bin to PATH for build commands
 ENV PATH="/app/node_modules/.bin:$PATH"
