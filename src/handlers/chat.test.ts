@@ -329,6 +329,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
@@ -346,6 +347,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
@@ -363,6 +365,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
@@ -380,6 +383,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
@@ -397,6 +401,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
@@ -418,6 +423,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
     });
@@ -438,6 +444,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
@@ -455,6 +462,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
@@ -473,6 +481,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
     });
@@ -495,6 +504,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
@@ -515,6 +525,7 @@ describe('handlers/chat', () => {
           mockNext
         );
 
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
     });
