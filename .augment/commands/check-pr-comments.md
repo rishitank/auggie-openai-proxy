@@ -24,12 +24,47 @@ git branch --show-current
 
 ### 2. Fetch Comments
 
-Use GitHub API to fetch all review comments:
+Use GitHub API to fetch **ALL** review comments with pagination:
+
+**IMPORTANT:** GitHub API limits responses to 100 items per page. You MUST paginate through all pages to get all comments.
+
+#### API Endpoints (with pagination)
 
 ```text
-GET /repos/{owner}/{repo}/pulls/{pr_number}/comments
-GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews
-GET /repos/{owner}/{repo}/issues/{pr_number}/comments
+GET /repos/{owner}/{repo}/pulls/{pr_number}/comments?per_page=100&page=1
+GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews?per_page=100&page=1
+GET /repos/{owner}/{repo}/issues/{pr_number}/comments?per_page=100&page=1
+```
+
+#### Pagination Strategy
+
+For each endpoint:
+
+1. Start with `page=1` and `per_page=100`
+2. Fetch the page and collect all items
+3. If the response contains 100 items, increment page and fetch again
+4. Continue until a page returns fewer than 100 items (or empty)
+5. Merge all pages into a single list
+
+Example pagination loop:
+
+```text
+page = 1
+all_comments = []
+while true:
+    response = GET /repos/{owner}/{repo}/pulls/{pr_number}/comments?per_page=100&page={page}
+    all_comments.extend(response)
+    if len(response) < 100:
+        break
+    page += 1
+```
+
+#### Review Details
+
+For each review returned by `/pulls/{pr_number}/reviews`, also fetch detailed review comments:
+
+```text
+GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews/{review_id}/comments?per_page=100
 ```
 
 ### 3. Categorize Comments

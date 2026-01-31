@@ -3,6 +3,15 @@
  * No external dependencies - uses basic counters
  */
 
+/**
+ * Escape a Prometheus label value per the exposition format specification.
+ * Escapes backslash, double-quote, and newline characters.
+ * @see https://prometheus.io/docs/instrumenting/exposition_formats/
+ */
+function escapePromLabel(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+
 /** Metrics data structure */
 interface Metrics {
   requestsTotal: number;
@@ -58,7 +67,8 @@ export function getPrometheusMetrics(): string {
   ];
 
   for (const [endpoint, count] of Object.entries(metrics.requestsByEndpoint)) {
-    lines.push(`auggie_requests_by_endpoint_total{endpoint="${endpoint}"} ${String(count)}`);
+    // Escape endpoint label value to prevent breaking Prometheus exposition format
+    lines.push(`auggie_requests_by_endpoint_total{endpoint="${escapePromLabel(endpoint)}"} ${String(count)}`);
   }
 
   lines.push('');
@@ -66,7 +76,8 @@ export function getPrometheusMetrics(): string {
   lines.push('# TYPE auggie_requests_by_status_total counter');
 
   for (const [status, count] of Object.entries(metrics.requestsByStatus)) {
-    lines.push(`auggie_requests_by_status_total{status="${status}"} ${String(count)}`);
+    // Status is already a string from Object.entries, escape for safety
+    lines.push(`auggie_requests_by_status_total{status="${escapePromLabel(status)}"} ${String(count)}`);
   }
 
   return lines.join('\n') + '\n';

@@ -1,9 +1,13 @@
 import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+// Use import.meta.url for CWD-independent path resolution (works in monorepos)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Read subpath imports from package.json to avoid duplication
-const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 const imports: Record<string, { 'auggie-dev': string; default: string }> = pkg.imports ?? {};
 
 // Build a custom resolver that emulates ESM-style subpath imports

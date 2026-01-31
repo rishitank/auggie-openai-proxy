@@ -39,7 +39,8 @@ const getClientForWebhook = (webhook: WebhookConfig, defaultPort: number): OpenA
  * Extract the prompt text from various webhook payload formats
  */
 const extractPrompt = (body: Record<string, unknown>): string | null => {
-  const fields = ['text', 'prompt', 'message', 'query', 'content', 'input', 'value2', 'value1'];
+  // Include value3 for IFTTT webhook compatibility (IFTTT sends value1, value2, value3)
+  const fields = ['text', 'prompt', 'message', 'query', 'content', 'input', 'value3', 'value2', 'value1'];
 
   for (const field of fields) {
     const value = body[field];
@@ -112,7 +113,7 @@ export const handleWebhook = async (
     if (prompt === null) {
       res.status(400).json(
         createErrorResponse(
-          'No prompt found in payload. Send text in one of: text, prompt, message, query, content, input, value1, value2',
+          'No prompt found in payload. Send text in one of: text, prompt, message, query, content, input, value1, value2, value3',
           'invalid_request_error',
           'missing_prompt'
         )

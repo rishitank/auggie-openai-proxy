@@ -76,6 +76,11 @@ const toLanguageModelMessage = (msg: ChatMessage): LMV2Message => {
         role: MessageRole.User,
         content: [{ type: ContentType.Text, text: msg.content }],
       };
+    default: {
+      // Exhaustive check: TypeScript will error if a new role is added but not handled
+      const _exhaustiveCheck: never = msg.role;
+      throw new Error(`Unhandled message role: ${String(_exhaustiveCheck)}`);
+    }
   }
 };
 
@@ -126,6 +131,23 @@ export class AugmentService {
   }
 
   /**
+   * Build generation options from prompt and GenerationOptions (DRY helper)
+   */
+  private buildModelOptions<T extends readonly LMV2Message[]>(
+    prompt: T,
+    options?: GenerationOptions
+  ): { prompt: T; maxOutputTokens?: number; stopSequences?: string[] } {
+    const modelOptions: { prompt: T; maxOutputTokens?: number; stopSequences?: string[] } = { prompt };
+    if (options?.maxOutputTokens !== undefined) {
+      modelOptions.maxOutputTokens = options.maxOutputTokens;
+    }
+    if (options?.stopSequences !== undefined && options.stopSequences.length > 0) {
+      modelOptions.stopSequences = options.stopSequences;
+    }
+    return modelOptions;
+  }
+
+  /**
    * Generate a chat completion (non-streaming)
    *
    * Uses doGenerate directly to avoid AI SDK version conflicts.
@@ -138,17 +160,8 @@ export class AugmentService {
     const model = this.createModel(modelName);
     const prompt = messages.map(toLanguageModelMessage);
 
-    // Build generation options
-    const generateOptions: { prompt: typeof prompt; maxOutputTokens?: number; stopSequences?: string[] } = { prompt };
-    if (options?.maxOutputTokens !== undefined) {
-      generateOptions.maxOutputTokens = options.maxOutputTokens;
-    }
-    if (options?.stopSequences !== undefined && options.stopSequences.length > 0) {
-      generateOptions.stopSequences = options.stopSequences;
-    }
-
     // Call doGenerate directly on the language model
-    const result = await model.doGenerate(generateOptions);
+    const result = await model.doGenerate(this.buildModelOptions(prompt, options));
 
     // Extract text from content array
     const textContent = result.content
@@ -182,17 +195,8 @@ export class AugmentService {
     const model = this.createModel(modelName);
     const prompt = messages.map(toLanguageModelMessage);
 
-    // Build stream options
-    const streamOptions: { prompt: typeof prompt; maxOutputTokens?: number; stopSequences?: string[] } = { prompt };
-    if (options?.maxOutputTokens !== undefined) {
-      streamOptions.maxOutputTokens = options.maxOutputTokens;
-    }
-    if (options?.stopSequences !== undefined && options.stopSequences.length > 0) {
-      streamOptions.stopSequences = options.stopSequences;
-    }
-
-    // Call doStream directly on the language model
-    const { stream } = await model.doStream(streamOptions);
+    // Call doStream directly on the language model (uses shared buildModelOptions helper)
+    const { stream } = await model.doStream(this.buildModelOptions(prompt, options));
 
     const reader = stream.getReader();
 

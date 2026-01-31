@@ -194,7 +194,8 @@ describe('handlers/webhook', () => {
     });
 
     it('should accept various prompt field names', async () => {
-      const fields = ['text', 'prompt', 'message', 'query', 'content', 'input', 'value1'];
+      // All supported fields including IFTTT value1, value2, value3
+      const fields = ['text', 'prompt', 'message', 'query', 'content', 'input', 'value3', 'value2', 'value1'];
 
       for (const field of fields) {
         mockReq = { params: { name: 'test-webhook' }, body: { [field]: 'Test' } };

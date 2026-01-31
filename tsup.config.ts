@@ -10,8 +10,9 @@ export default defineConfig({
   splitting: false,
   treeshake: true,
   // Use auggie-dev condition for subpath imports resolution during build
+  // Append to existing conditions instead of overwriting to preserve defaults like 'import', 'default'
   esbuildOptions(options) {
-    options.conditions = ['auggie-dev'];
+    options.conditions = [...(options.conditions ?? []), 'auggie-dev'];
   },
 });
 
