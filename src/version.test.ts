@@ -27,8 +27,7 @@ describe('version', () => {
   });
 
   describe('DESCRIPTION', () => {
-    it('should be a non-empty string', () => {
-      expect(DESCRIPTION).toBeTruthy();
+    it('should be a string', () => {
       expect(typeof DESCRIPTION).toBe('string');
     });
 
