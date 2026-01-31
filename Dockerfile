@@ -17,8 +17,8 @@ RUN npm ci --ignore-scripts
 COPY src ./src
 
 # Build TypeScript (type checking is done in CI, not here)
-# tsup handles the build and transpilation
-RUN npm run build
+# Use npx to run tsup since --ignore-scripts doesn't set up node_modules/.bin
+RUN npx tsup
 
 # Production stage - minimal runtime image
 ARG NODE_VERSION=25
