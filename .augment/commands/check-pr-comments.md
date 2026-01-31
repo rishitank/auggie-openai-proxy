@@ -64,7 +64,7 @@ while true:
 For each review returned by `/pulls/{pr_number}/reviews`, also fetch detailed review comments:
 
 ```text
-GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews/{review_id}/comments?per_page=100
+GET /repos/{owner}/{repo}/pulls/{pr_number}/reviews/{review_id}/comments?per_page=100&page=1
 ```
 
 ### 3. Categorize Comments

@@ -71,13 +71,14 @@ export const requestLogger = (
  * Replaces dynamic segments (UUIDs, numbers) with placeholders.
  */
 const normalizePath = (path: string): string => {
-  return path
+  const normalized = path
     // Replace UUIDs (8-4-4-4-12 format)
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ':id')
     // Replace numeric IDs
-    .replace(/\/\d+/g, '/:id')
-    // Bucket any remaining unknown paths to prevent explosion
-    || '/:unmatched';
+    .replace(/\/\d+/g, '/:id');
+
+  // If no transformation occurred and path is empty or just slashes, use fallback
+  return normalized && normalized !== '/' ? normalized : '/:unmatched';
 };
 
 export const metricsRecorder = (
