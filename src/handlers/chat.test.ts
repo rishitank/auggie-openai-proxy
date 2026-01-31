@@ -4,8 +4,9 @@
  * Verifies the /v1/chat/completions endpoint handler
  */
 
-import type { Request, Response, NextFunction } from 'express';
+import type { Request } from 'express';
 import { handleChatCompletion } from './chat';
+import { createMockResponse, createMockNext, type MockResponse } from '../test-utils';
 
 interface ChatCompletionResponse {
   object: string;
@@ -52,22 +53,12 @@ vi.mock('#services/context', () => ({
 describe('handlers/chat', () => {
   describe('handleChatCompletion', () => {
     let mockReq: Partial<Request>;
-    let mockRes: Partial<Response>;
-    let mockNext: NextFunction;
-    let jsonMock: ReturnType<typeof vi.fn>;
-    let statusMock: ReturnType<typeof vi.fn>;
+    let mockRes: MockResponse;
+    let mockNext: ReturnType<typeof createMockNext>;
 
     beforeEach(() => {
-      jsonMock = vi.fn();
-      statusMock = vi.fn().mockReturnThis();
-      mockRes = {
-        json: jsonMock,
-        status: statusMock,
-        setHeader: vi.fn(),
-        write: vi.fn(),
-        end: vi.fn(),
-      };
-      mockNext = vi.fn();
+      mockRes = createMockResponse();
+      mockNext = createMockNext();
     });
 
     it('should return 400 for invalid request', async () => {
@@ -75,12 +66,12 @@ describe('handlers/chat', () => {
 
       await handleChatCompletion(
         mockReq as Request,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(statusMock).toHaveBeenCalledWith(400);
-      expect(jsonMock).toHaveBeenCalledWith(
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           error: expect.objectContaining({
             type: 'invalid_request_error',
@@ -94,11 +85,11 @@ describe('handlers/chat', () => {
 
       await handleChatCompletion(
         mockReq as Request,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(mockRes.status).toHaveBeenCalledWith(400);
     });
 
     it('should return completion for valid non-streaming request', async () => {
@@ -111,12 +102,12 @@ describe('handlers/chat', () => {
 
       await handleChatCompletion(
         mockReq as Request,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(jsonMock).toHaveBeenCalledTimes(1);
-      const calls = jsonMock.mock.calls;
+      expect(mockRes.json).toHaveBeenCalledTimes(1);
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       assertDefined(calls[0]);
       const response = calls[0][0] as ChatCompletionResponse;
@@ -138,11 +129,11 @@ describe('handlers/chat', () => {
 
       await handleChatCompletion(
         mockReq as Request,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      const calls = jsonMock.mock.calls;
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       assertDefined(calls[0]);
       const response = calls[0][0] as ChatCompletionResponse;
@@ -172,11 +163,11 @@ describe('handlers/chat', () => {
 
       await handleChatCompletion(
         mockReq as Request,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      const calls = jsonMock.mock.calls;
+      const calls = mockRes.json.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
       assertDefined(calls[0]);
       const response = calls[0][0] as ChatCompletionResponse;
@@ -200,7 +191,7 @@ describe('handlers/chat', () => {
 
       await handleChatCompletion(
         mockReq as Request,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
@@ -223,11 +214,11 @@ describe('handlers/chat', () => {
 
       await handleChatCompletion(
         mockReq as Request,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(jsonMock).toHaveBeenCalledTimes(1);
+      expect(mockRes.json).toHaveBeenCalledTimes(1);
     });
 
     it('should handle request without user messages', async () => {
@@ -239,11 +230,11 @@ describe('handlers/chat', () => {
 
       await handleChatCompletion(
         mockReq as Request,
-        mockRes as Response,
+        mockRes.asResponse(),
         mockNext
       );
 
-      expect(jsonMock).toHaveBeenCalledTimes(1);
+      expect(mockRes.json).toHaveBeenCalledTimes(1);
     });
 
     // Parameterized tests for OpenAI tool/function message formats
@@ -312,13 +303,13 @@ describe('handlers/chat', () => {
 
         await handleChatCompletion(
           mockReq as Request,
-          mockRes as Response,
+          mockRes.asResponse(),
           mockNext
         );
 
         // Should succeed (not return 400)
-        expect(statusMock).not.toHaveBeenCalledWith(400);
-        expect(jsonMock).toHaveBeenCalledTimes(1);
+        expect(mockRes.status).not.toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledTimes(1);
       }
     );
 
@@ -344,12 +335,12 @@ describe('handlers/chat', () => {
 
           await handleChatCompletion(
             mockReq as Request,
-            mockRes as Response,
+            mockRes.asResponse(),
             mockNext
           );
 
-          expect(jsonMock).toHaveBeenCalledTimes(1);
-          const calls = jsonMock.mock.calls;
+          expect(mockRes.json).toHaveBeenCalledTimes(1);
+          const calls = mockRes.json.mock.calls;
           expect(calls.length).toBeGreaterThan(0);
           assertDefined(calls[0]);
           const response = calls[0][0] as ChatCompletionResponse;
@@ -367,12 +358,12 @@ describe('handlers/chat', () => {
 
         await handleChatCompletion(
           mockReq as Request,
-          mockRes as Response,
+          mockRes.asResponse(),
           mockNext
         );
 
-        expect(jsonMock).toHaveBeenCalledTimes(1);
-        const calls = jsonMock.mock.calls;
+        expect(mockRes.json).toHaveBeenCalledTimes(1);
+        const calls = mockRes.json.mock.calls;
         assertDefined(calls[0]);
         const response = calls[0][0] as ChatCompletionResponse;
         expect(response.model).toBe('claude-sonnet-4-5');
@@ -388,12 +379,12 @@ describe('handlers/chat', () => {
 
         await handleChatCompletion(
           mockReq as Request,
-          mockRes as Response,
+          mockRes.asResponse(),
           mockNext
         );
 
-        expect(statusMock).toHaveBeenCalledWith(400);
-        const calls = jsonMock.mock.calls;
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        const calls = mockRes.json.mock.calls;
         assertDefined(calls[0]);
         const errorResponse = calls[0][0] as { error: { message: string; code: string } };
         expect(errorResponse.error.message).toContain('Unknown model');
@@ -410,12 +401,12 @@ describe('handlers/chat', () => {
 
         await handleChatCompletion(
           mockReq as Request,
-          mockRes as Response,
+          mockRes.asResponse(),
           mockNext
         );
 
-        expect(statusMock).toHaveBeenCalledWith(400);
-        const calls = jsonMock.mock.calls;
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        const calls = mockRes.json.mock.calls;
         assertDefined(calls[0]);
         const errorResponse = calls[0][0] as { error: { message: string } };
         expect(errorResponse.error.message).toContain('Available models:');
