@@ -238,19 +238,19 @@ let contextServiceInstance: ContextService | null = null;
 /**
  * Get or create the ContextService singleton
  */
-export function getContextService(): ContextService {
+export const getContextService = (): ContextService => {
   contextServiceInstance ??= new ContextService();
   return contextServiceInstance;
-}
+};
 
 /**
  * Initialize the context service with configuration
  */
-export async function initializeContextService(
+export const initializeContextService = async (
   config: Partial<ContextServiceConfig>
-): Promise<ContextService> {
+): Promise<ContextService> => {
   contextServiceInstance = new ContextService(config);
   await contextServiceInstance.initialize();
   return contextServiceInstance;
-}
+};
 

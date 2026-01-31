@@ -4,17 +4,10 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ESNext"],
+    "types": ["vitest/globals", "node"],
     "outDir": "./dist",
     "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "@config": ["src/config"],
-      "@types": ["src/types"],
-      "@types/*": ["src/types/*"],
-      "@services/*": ["src/services/*"],
-      "@handlers/*": ["src/handlers/*"],
-      "@middleware/*": ["src/middleware/*"]
-    },
+    "customConditions": ["auggie-dev"],
     "strict": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
@@ -35,6 +28,6 @@
     "isolatedModules": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist"]
 }
 

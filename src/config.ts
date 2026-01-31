@@ -5,8 +5,11 @@
  * Uses environment variables with sensible defaults
  */
 
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { z } from 'zod';
-import { WebhookConfigSchema, type WebhookConfig } from '@types';
+import { WebhookConfigSchema, type WebhookConfig } from '#types';
 
 const ConfigSchema = z.object({
   port: z.coerce.number().int().positive().default(3456),
@@ -33,7 +36,7 @@ export type Config = z.infer<typeof ConfigSchema>;
  * Parse WEBHOOKS JSON from environment variable
  * Format: [{"name": "assistant", "model": "claude-sonnet-4-5", "systemPrompt": "..."}]
  */
-function parseWebhooksFromEnv(): z.infer<typeof WebhookConfigSchema>[] {
+const parseWebhooksFromEnv = (): z.infer<typeof WebhookConfigSchema>[] => {
   const webhooksJson = process.env.WEBHOOKS;
   if (webhooksJson === undefined || webhooksJson === '') {
     return [];
@@ -72,13 +75,13 @@ function parseWebhooksFromEnv(): z.infer<typeof WebhookConfigSchema>[] {
     console.warn('[Config] Failed to parse WEBHOOKS JSON, ignoring');
     return [];
   }
-}
+};
 
 /**
  * Load and validate configuration from environment variables
  */
-export function loadConfig(): Config {
-  return ConfigSchema.parse({
+export const loadConfig = (): Config =>
+  ConfigSchema.parse({
     port: process.env.PORT,
     host: process.env.HOST,
     augment: {
@@ -95,21 +98,107 @@ export function loadConfig(): Config {
     },
     webhooks: parseWebhooksFromEnv(),
   });
-}
+
+/**
+ * Validate environment and warn about potential issues
+ * Returns array of warning messages (empty if all good)
+ */
+export const validateEnvironment = (): string[] => {
+  const warnings: string[] = [];
+
+  // Check for Augment credentials
+  const envToken = process.env.AUGMENT_API_TOKEN;
+  const hasEnvToken = envToken !== undefined && envToken !== '';
+  const hasSessionFile = ((): boolean => {
+    try {
+      const sessionPath = join(homedir(), '.augment', 'session.json');
+      return existsSync(sessionPath);
+    } catch {
+      return false;
+    }
+  })();
+
+  if (!hasEnvToken && !hasSessionFile) {
+    warnings.push(
+      'No Augment credentials found. Set AUGMENT_API_TOKEN or run `auggie login`'
+    );
+  }
+
+  // Check context configuration
+  const workspaceDir = process.env.CONTEXT_WORKSPACE_DIR;
+  if (process.env.CONTEXT_ENABLED === 'true' && (workspaceDir === undefined || workspaceDir === '')) {
+    warnings.push(
+      'CONTEXT_ENABLED=true but CONTEXT_WORKSPACE_DIR not set'
+    );
+  }
+
+  return warnings;
+};
 
 /**
  * Available models exposed by the proxy
  *
  * These are the model IDs for AugmentLanguageModel (AI SDK Provider).
+ * VERIFIED: Tested against Augment API on 2026-01-31
  * See: https://docs.augmentcode.com/models/available-models
+ *
+ * Note: Official docs mention GPT-5.1/GPT-5.2, but the API accepts 'gpt-5'
+ * which is mapped to the current GPT-5 version internally.
  */
 export const AVAILABLE_MODELS = [
   'claude-sonnet-4-5',   // Claude Sonnet 4.5 (default, best balance)
   'claude-haiku-4-5',    // Claude Haiku 4.5 (fast, lightweight)
   'claude-opus-4-5',     // Claude Opus 4.5 (most capable)
   'claude-sonnet-4',     // Claude Sonnet 4 (previous gen)
-  'gpt-5',               // OpenAI GPT-5
+  'gpt-5',               // OpenAI GPT-5 (maps to current version)
 ] as const;
 
 export type AvailableModel = (typeof AVAILABLE_MODELS)[number];
+
+/**
+ * Model aliases map common/legacy model names to available Augment models
+ * This allows clients using older OpenAI model names to work seamlessly
+ */
+export const MODEL_ALIASES: Record<string, AvailableModel> = {
+  // OpenAI GPT-4 variants -> gpt-5
+  'gpt-4o': 'gpt-5',
+  'gpt-4o-mini': 'gpt-5',
+  'gpt-4-turbo': 'gpt-5',
+  'gpt-4-turbo-preview': 'gpt-5',
+  'gpt-4': 'gpt-5',
+  'gpt-4-0613': 'gpt-5',
+  'gpt-4-0314': 'gpt-5',
+  'gpt-3.5-turbo': 'gpt-5',
+  'gpt-3.5-turbo-16k': 'gpt-5',
+
+  // Claude 3 Opus variants -> claude-opus-4-5
+  'claude-3-opus-20240229': 'claude-opus-4-5',
+  'claude-3-opus': 'claude-opus-4-5',
+
+  // Claude 3 Sonnet variants -> claude-sonnet-4-5
+  'claude-3-sonnet-20240229': 'claude-sonnet-4-5',
+  'claude-3-sonnet': 'claude-sonnet-4-5',
+  'claude-3-5-sonnet-20240620': 'claude-sonnet-4-5',
+  'claude-3-5-sonnet-20241022': 'claude-sonnet-4-5',
+  'claude-3-5-sonnet': 'claude-sonnet-4-5',
+
+  // Claude 3 Haiku variants -> claude-haiku-4-5
+  'claude-3-haiku-20240307': 'claude-haiku-4-5',
+  'claude-3-haiku': 'claude-haiku-4-5',
+  'claude-3-5-haiku-20241022': 'claude-haiku-4-5',
+  'claude-3-5-haiku': 'claude-haiku-4-5',
+};
+
+/**
+ * Resolve a model name to an available model
+ * Returns the model if it's available, resolves alias if exists, or undefined
+ */
+export const resolveModelAlias = (model: string): AvailableModel | undefined => {
+  // Check if it's already an available model
+  if (AVAILABLE_MODELS.includes(model as AvailableModel)) {
+    return model as AvailableModel;
+  }
+  // Check if it's an alias
+  return MODEL_ALIASES[model];
+};
 

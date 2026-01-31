@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/rishitank/auggie-openai-proxy#readme
+    about: Check the README for usage instructions and examples
+  - name: 💬 Discussions
+    url: https://github.com/rishitank/auggie-openai-proxy/discussions
+    about: Ask questions and discuss ideas
+

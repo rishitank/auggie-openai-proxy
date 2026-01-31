@@ -1,0 +1,32 @@
+# Dependencies
+node_modules
+
+# Build output (rebuilt in container)
+dist
+
+# Test and coverage
+coverage
+*.test.ts
+
+# Development files
+.git
+.gitignore
+.env
+.env.*
+.nvmrc
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation (not needed in image)
+*.md
+!README.md
+
+# Misc
+.DS_Store
+*.log
+tmp
+

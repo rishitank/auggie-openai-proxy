@@ -1,23 +1,59 @@
 {
   "name": "auggie-openai-proxy",
-  "version": "1.4.0",
+  "version": "1.0.0",
   "description": "OpenAI-compatible API proxy for Augment Code using Auggie SDK",
   "main": "dist/index.js",
   "type": "module",
   "engines": {
     "node": ">=25.0.0"
   },
+  "imports": {
+    "#config": {
+      "auggie-dev": "./src/config.ts",
+      "default": "./dist/config.js"
+    },
+    "#version": {
+      "auggie-dev": "./src/version.ts",
+      "default": "./dist/version.js"
+    },
+    "#types": {
+      "auggie-dev": "./src/types/index.ts",
+      "default": "./dist/types/index.js"
+    },
+    "#types/*": {
+      "auggie-dev": "./src/types/*.ts",
+      "default": "./dist/types/*.js"
+    },
+    "#services/*": {
+      "auggie-dev": "./src/services/*.ts",
+      "default": "./dist/services/*.js"
+    },
+    "#handlers/*": {
+      "auggie-dev": "./src/handlers/*.ts",
+      "default": "./dist/handlers/*.js"
+    },
+    "#middleware": {
+      "auggie-dev": "./src/middleware/index.ts",
+      "default": "./dist/middleware/index.js"
+    },
+    "#middleware/*": {
+      "auggie-dev": "./src/middleware/*.ts",
+      "default": "./dist/middleware/*.js"
+    }
+  },
   "scripts": {
     "build": "tsup",
     "start": "node dist/index.js",
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --experimental-transform-types --conditions=auggie-dev --watch src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
+    "lint:workflows": "if command -v actionlint >/dev/null 2>&1; then if command -v shellcheck >/dev/null 2>&1; then actionlint -color; else actionlint -color -shellcheck=; fi; else echo 'actionlint not found. Install with: brew install actionlint shellcheck' >&2; exit 2; fi",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint"
+    "check": "npm run typecheck && npm run lint && npm run lint:workflows",
+    "prepare": "husky"
   },
   "keywords": [
     "augment",
@@ -30,21 +66,29 @@
   "license": "MIT",
   "dependencies": {
     "@augmentcode/auggie-sdk": "^0.1.14",
+    "compression": "^1.8.1",
     "express": "^5.1.0",
     "openai": "^6.17.0",
     "zod": "^3.25.67"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.4.0",
+    "@commitlint/config-conventional": "^20.4.0",
     "@eslint/js": "^9.28.0",
+    "@types/compression": "^1.8.1",
     "@types/express": "^5.0.3",
     "@types/node": "^22.15.30",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.28.0",
     "eslint-config-prettier": "^10.1.5",
+    "husky": "^9.1.7",
     "tsup": "^8.5.1",
-    "tsx": "^4.20.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.34.0",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "jsondiffpatch": ">=0.7.2",
+    "ai": ">=5.0.52"
   }
 }

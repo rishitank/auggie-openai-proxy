@@ -1,0 +1,13 @@
+services:
+  auggie-openai-proxy:
+    build: .
+    image: auggie-openai-proxy:latest
+    container_name: auggie-openai-proxy
+    ports:
+      - "3456:3456"
+    volumes:
+      # Mount Augment credentials (read-only)
+      # Use ${HOME} instead of ~ for proper shell expansion in docker-compose
+      - ${HOME}/.augment:/home/auggie/.augment:ro
+    restart: unless-stopped
+
