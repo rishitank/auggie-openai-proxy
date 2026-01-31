@@ -19,7 +19,8 @@ COPY src ./src
 
 # Build TypeScript and run type checking
 # Use tsconfig.build.json which excludes vitest/globals types (not needed for production)
-RUN tsc --noEmit -p tsconfig.build.json && npm run build
+# Use npx to run tsc since --ignore-scripts doesn't set up node_modules/.bin
+RUN npx tsc --noEmit -p tsconfig.build.json && npm run build
 
 # Production stage - minimal runtime image
 ARG NODE_VERSION=25
