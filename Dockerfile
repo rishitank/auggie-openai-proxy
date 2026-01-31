@@ -7,8 +7,7 @@ WORKDIR /app
 
 # Copy package files first for better layer caching
 COPY package*.json ./
-COPY tsconfig.json tsconfig.build.json ./
-COPY tsup.config.ts ./
+COPY tsconfig.json tsup.config.ts ./
 
 # Install all dependencies (including dev for build)
 # --ignore-scripts prevents husky from running during build
@@ -17,10 +16,9 @@ RUN npm ci --ignore-scripts
 # Copy source code
 COPY src ./src
 
-# Build TypeScript and run type checking
-# Use tsconfig.build.json which excludes vitest/globals types (not needed for production)
-# Use npx to run tsc since --ignore-scripts doesn't set up node_modules/.bin
-RUN npx tsc --noEmit -p tsconfig.build.json && npm run build
+# Build TypeScript (type checking is done in CI, not here)
+# tsup handles the build and transpilation
+RUN npm run build
 
 # Production stage - minimal runtime image
 ARG NODE_VERSION=25
