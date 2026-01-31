@@ -32,6 +32,9 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV=production
 
+# Install curl for healthchecks (required by Coolify - it ignores Dockerfile HEALTHCHECK)
+RUN apk add --no-cache curl
+
 # Copy package files and install production deps only
 # --ignore-scripts prevents husky from running (it's a dev dependency)
 COPY package*.json ./
@@ -49,9 +52,9 @@ USER auggie
 
 EXPOSE 3456
 
-# Health check with curl (more reliable than wget)
+# Health check using curl (required for Coolify compatibility)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:3456/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+  CMD curl -f http://localhost:3456/health || exit 1
 
 CMD ["node", "--enable-source-maps", "dist/index.js"]
 
