@@ -27,7 +27,7 @@ OpenAI message content can be string or array of content parts:
 { role: 'user', content: [{ type: 'text', text: 'Hello' }] }
 ```
 
-Always normalize to string for Augment SDK compatibility.
+**The proxy automatically normalizes all message content to a string format for Augment SDK compatibility.** Consumers do not need to perform this conversion themselves—the `normalizeMessageContent()` utility handles both string and array (multimodal) content formats transparently.
 
 ## Streaming Responses
 

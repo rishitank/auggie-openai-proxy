@@ -28,13 +28,15 @@ This project uses **Node.js 24** with native TypeScript support (no transpilatio
 
 ## Build Configuration
 
-For production builds, use `tsup` with esbuild conditions:
+For production builds, use `tsup` with the `auggie-dev` condition to resolve custom subpath imports defined in `package.json`:
 
 ```typescript
 // tsup.config.ts
 export default defineConfig({
   esbuildOptions(options) {
-    options.conditions = ['node', 'import'];
+    options.conditions = ['auggie-dev'];
   },
 });
 ```
+
+This condition maps to the `imports` field in `package.json` for proper module resolution during bundling.
