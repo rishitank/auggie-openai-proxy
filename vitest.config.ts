@@ -60,7 +60,7 @@ export default defineConfig({
       ],
       thresholds: {
         statements: 80,
-        branches: 75, // Lowered from 80% due to Vitest 4 coverage calculation changes
+        branches: 80,
         functions: 80,
         lines: 80,
       },

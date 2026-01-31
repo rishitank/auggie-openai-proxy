@@ -79,6 +79,55 @@ describe('services/augment', () => {
         expect(result.usage).toEqual({ promptTokens: 10, completionTokens: 20 });
       });
 
+      it('should handle developer role messages (maps to system)', async () => {
+        const messages = [
+          { role: MessageRole.Developer, content: 'You are a helpful assistant' },
+          { role: MessageRole.User, content: 'Hello' },
+        ];
+
+        const result = await service.generateCompletion(messages, 'claude-sonnet-4-5');
+
+        expect(result.text).toBe('Generated response');
+      });
+
+      it('should handle tool role messages (filtered to user)', async () => {
+        const messages = [
+          { role: MessageRole.User, content: 'Calculate 2+2' },
+          { role: MessageRole.Tool, content: 'Result: 4' },
+        ];
+
+        const result = await service.generateCompletion(messages, 'claude-sonnet-4-5');
+
+        expect(result.text).toBe('Generated response');
+      });
+
+      it('should handle function role messages (filtered to user)', async () => {
+        const messages = [
+          { role: MessageRole.User, content: 'Get weather' },
+          { role: MessageRole.Function, content: '{"temp": 72}' },
+        ];
+
+        const result = await service.generateCompletion(messages, 'claude-sonnet-4-5');
+
+        expect(result.text).toBe('Generated response');
+      });
+
+      it('should handle mixed role messages including developer, tool, and function', async () => {
+        const messages = [
+          { role: MessageRole.System, content: 'System prompt' },
+          { role: MessageRole.Developer, content: 'Developer instructions' },
+          { role: MessageRole.User, content: 'Calculate something' },
+          { role: MessageRole.Assistant, content: 'Let me calculate' },
+          { role: MessageRole.Tool, content: 'Result: 42' },
+          { role: MessageRole.Function, content: '{"result": 42}' },
+          { role: MessageRole.User, content: 'Thanks!' },
+        ];
+
+        const result = await service.generateCompletion(messages, 'claude-sonnet-4-5');
+
+        expect(result.text).toBe('Generated response');
+      });
+
       it('should throw if not initialized', async () => {
         const uninitializedService = new AugmentService();
         const messages = [{ role: MessageRole.User, content: 'Hello' }];
