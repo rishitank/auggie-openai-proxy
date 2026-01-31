@@ -203,11 +203,11 @@ export const handleChatCompletion = async (
     // Validate request body with Zod
     const parseResult = ChatCompletionRequestSchema.safeParse(req.body);
     if (!parseResult.success) {
-      const firstError = parseResult.error.errors[0];
-      const errorMessage = firstError?.message ?? 'Invalid request';
-      const errorPath = firstError?.path.join('.') ?? 'unknown';
+      const firstIssue = parseResult.error.issues[0];
+      const errorMessage = firstIssue?.message ?? 'Invalid request';
+      const errorPath = firstIssue?.path.join('.') ?? 'unknown';
       console.error(`[Chat] Validation failed: ${errorMessage} at path: ${errorPath}`);
-      console.error(`[Chat] Full validation errors: ${JSON.stringify(parseResult.error.errors)}`);
+      console.error(`[Chat] Full validation errors: ${JSON.stringify(parseResult.error.issues)}`);
       res.status(400).json(
         createErrorResponse(
           errorMessage,

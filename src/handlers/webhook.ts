@@ -99,7 +99,7 @@ export const handleWebhook = async (
     if (!parseResult.success) {
       res.status(400).json(
         createErrorResponse(
-          `Invalid webhook payload: ${parseResult.error.errors[0]?.message ?? 'validation failed'}`,
+          `Invalid webhook payload: ${parseResult.error.issues[0]?.message ?? 'validation failed'}`,
           'invalid_request_error',
           'invalid_payload'
         )

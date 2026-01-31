@@ -30,7 +30,7 @@ export enum ContentType {
 // =============================================================================
 
 /** OpenAI message role schema (for Zod validation) */
-export const MessageRoleSchema = z.nativeEnum(MessageRole);
+export const MessageRoleSchema = z.enum(MessageRole);
 
 /**
  * Content can be either a string or an array of content parts
@@ -43,12 +43,12 @@ const _TextContentPartSchema = z.object({
 });
 type TextContentPart = z.infer<typeof _TextContentPartSchema>;
 
-/** Any content part - we use passthrough to accept image_url and other types */
+/** Any content part - we use loose() to accept image_url and other types */
 const AnyContentPartSchema = z
   .object({
     type: z.string(),
   })
-  .passthrough();
+  .loose();
 
 const ContentSchema = z.union([
   z.string(),
@@ -57,7 +57,7 @@ const ContentSchema = z.union([
 
 /**
  * OpenAI chat message - supports both string and array content
- * Uses passthrough() to allow additional fields like tool_call_id, name, etc.
+ * Uses loose() to allow additional fields like tool_call_id, name, etc.
  * that are present in tool/function messages
  */
 export const OpenAIMessageSchema = z
@@ -65,7 +65,7 @@ export const OpenAIMessageSchema = z
     role: MessageRoleSchema,
     content: ContentSchema.nullable(), // Tool messages can have null content
   })
-  .passthrough();
+  .loose();
 
 /** Normalized message with string content */
 export interface OpenAIMessage {
@@ -135,7 +135,7 @@ export const ChatCompletionRequestSchema = z
     logprobs: z.boolean().optional(),
     top_logprobs: z.number().int().min(0).max(20).optional(),
   })
-  .passthrough(); // Allow additional OpenAI fields (tools, response_format, tool_choice, etc.)
+  .loose(); // Allow additional OpenAI fields (tools, response_format, tool_choice, etc.)
 export type ChatCompletionRequest = z.infer<typeof ChatCompletionRequestSchema>;
 
 /**
