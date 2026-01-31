@@ -11,7 +11,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import OpenAI from 'openai';
-import { WebhookRequestSchema } from '#types';
+import { WebhookRequestSchema, createErrorResponse } from '#types';
 import { loadConfig, type WebhookConfig } from '#config';
 
 /** Cache of OpenAI clients per webhook (keyed by baseURL + apiKey) */
@@ -72,25 +72,37 @@ export const handleWebhook = async (
     // Find the webhook configuration
     const webhook = config.webhooks.find((w) => w.name === webhookName);
     if (webhook === undefined) {
-      res.status(404).json({
-        error: `Webhook '${webhookName}' not found`,
-        available: config.webhooks.map((w) => w.name),
-      });
+      res.status(404).json(
+        createErrorResponse(
+          `Webhook '${webhookName}' not found. Available: ${config.webhooks.map((w) => w.name).join(', ') || 'none'}`,
+          'not_found_error',
+          'webhook_not_found'
+        )
+      );
       return;
     }
 
     if (!webhook.enabled) {
-      res.status(503).json({ error: `Webhook '${webhookName}' is disabled` });
+      res.status(503).json(
+        createErrorResponse(
+          `Webhook '${webhookName}' is disabled`,
+          'service_unavailable_error',
+          'webhook_disabled'
+        )
+      );
       return;
     }
 
     // Validate request body
     const parseResult = WebhookRequestSchema.safeParse(req.body);
     if (!parseResult.success) {
-      res.status(400).json({
-        error: 'Invalid webhook payload',
-        details: parseResult.error.errors,
-      });
+      res.status(400).json(
+        createErrorResponse(
+          `Invalid webhook payload: ${parseResult.error.errors[0]?.message ?? 'validation failed'}`,
+          'invalid_request_error',
+          'invalid_payload'
+        )
+      );
       return;
     }
 
@@ -98,10 +110,13 @@ export const handleWebhook = async (
     const prompt = extractPrompt(body as Record<string, unknown>);
 
     if (prompt === null) {
-      res.status(400).json({
-        error: 'No prompt found in payload',
-        hint: 'Send text in one of: text, prompt, message, query, content, input, value1, value2',
-      });
+      res.status(400).json(
+        createErrorResponse(
+          'No prompt found in payload. Send text in one of: text, prompt, message, query, content, input, value1, value2',
+          'invalid_request_error',
+          'missing_prompt'
+        )
+      );
       return;
     }
 

@@ -9,7 +9,7 @@ This project implements an OpenAI-compatible API proxy for the Augment SDK.
 OpenAI roles map to Augment SDK roles:
 
 | OpenAI Role | Augment Role |
-|-------------|--------------|
+| --- | --- |
 | `system` | `System` |
 | `developer` | `System` (mapped) |
 | `user` | `User` |
@@ -33,7 +33,7 @@ OpenAI message content can be string or array of content parts:
 
 Use Server-Sent Events (SSE) format for streaming:
 
-```
+```text
 data: {"id":"...","choices":[{"delta":{"content":"Hello"}}]}
 
 data: [DONE]

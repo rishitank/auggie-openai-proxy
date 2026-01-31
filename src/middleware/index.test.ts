@@ -5,7 +5,8 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { requestLogger, errorHandler } from './index';
+import { requestLogger, errorHandler, metricsRecorder, cors, requestTimeout, securityHeaders, requestId } from './index';
+import * as metricsService from '#services/metrics';
 
 const noop: () => void = () => undefined;
 
@@ -122,6 +123,285 @@ describe('middleware', () => {
       errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
       expect(consoleSpy).toHaveBeenCalledWith('[Error]', error);
+    });
+  });
+
+  describe('metricsRecorder', () => {
+    let mockReq: Partial<Request>;
+    let mockRes: Partial<Response>;
+    let mockNext: NextFunction;
+    let recordRequestSpy: ReturnType<typeof vi.spyOn>;
+    let finishHandler: (() => void) | undefined;
+
+    beforeEach(() => {
+      mockReq = {
+        method: 'POST',
+        path: '/v1/chat/completions',
+        route: { path: '/v1/chat/completions' },
+      };
+      mockRes = {
+        statusCode: 200,
+        on: vi.fn((event: string, handler: () => void) => {
+          if (event === 'finish') {
+            finishHandler = handler;
+          }
+          return mockRes as Response;
+        }),
+      };
+      mockNext = vi.fn();
+      recordRequestSpy = vi.spyOn(metricsService, 'recordRequest').mockImplementation(noop);
+    });
+
+    it('should call next()', () => {
+      metricsRecorder(mockReq as Request, mockRes as Response, mockNext);
+      expect(mockNext).toHaveBeenCalledTimes(1);
+    });
+
+    it('should record request on finish', () => {
+      metricsRecorder(mockReq as Request, mockRes as Response, mockNext);
+      expect(finishHandler).toBeDefined();
+      finishHandler?.();
+      expect(recordRequestSpy).toHaveBeenCalledWith('POST /v1/chat/completions', 200);
+    });
+
+    it('should use path when route is undefined', () => {
+      mockReq.route = undefined;
+      metricsRecorder(mockReq as Request, mockRes as Response, mockNext);
+      finishHandler?.();
+      expect(recordRequestSpy).toHaveBeenCalledWith('POST /v1/chat/completions', 200);
+    });
+  });
+
+  describe('cors', () => {
+    let mockReq: Partial<Request>;
+    let mockRes: Partial<Response>;
+    let mockNext: NextFunction;
+    let setHeaderMock: ReturnType<typeof vi.fn>;
+    let statusMock: ReturnType<typeof vi.fn>;
+    let endMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockReq = { method: 'GET' };
+      setHeaderMock = vi.fn();
+      endMock = vi.fn();
+      statusMock = vi.fn().mockReturnValue({ end: endMock });
+      mockRes = {
+        setHeader: setHeaderMock,
+        status: statusMock,
+      };
+      mockNext = vi.fn();
+    });
+
+    it('should set CORS headers', () => {
+      cors(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(setHeaderMock).toHaveBeenCalledWith('Access-Control-Allow-Origin', '*');
+      expect(setHeaderMock).toHaveBeenCalledWith('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      expect(setHeaderMock).toHaveBeenCalledWith('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      expect(setHeaderMock).toHaveBeenCalledWith('Access-Control-Max-Age', '86400');
+    });
+
+    it('should call next() for non-OPTIONS requests', () => {
+      cors(mockReq as Request, mockRes as Response, mockNext);
+      expect(mockNext).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return 204 for OPTIONS preflight requests', () => {
+      mockReq.method = 'OPTIONS';
+      cors(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(statusMock).toHaveBeenCalledWith(204);
+      expect(endMock).toHaveBeenCalled();
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('requestTimeout', () => {
+    let mockReq: Partial<Request>;
+    let mockRes: Partial<Response>;
+    let mockNext: NextFunction;
+    let statusMock: ReturnType<typeof vi.fn>;
+    let jsonMock: ReturnType<typeof vi.fn>;
+    let finishHandler: (() => void) | undefined;
+    let closeHandler: (() => void) | undefined;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mockReq = { body: {} };
+      jsonMock = vi.fn();
+      statusMock = vi.fn().mockReturnValue({ json: jsonMock });
+      mockRes = {
+        headersSent: false,
+        status: statusMock,
+        on: vi.fn((event: string, handler: () => void) => {
+          if (event === 'finish') finishHandler = handler;
+          if (event === 'close') closeHandler = handler;
+          return mockRes as Response;
+        }),
+      };
+      mockNext = vi.fn();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should call next()', () => {
+      const middleware = requestTimeout(1000);
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+      expect(mockNext).toHaveBeenCalledTimes(1);
+    });
+
+    it('should skip timeout for streaming requests', () => {
+      mockReq.body = { stream: true };
+      const middleware = requestTimeout(1000);
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      vi.advanceTimersByTime(2000);
+      expect(statusMock).not.toHaveBeenCalled();
+    });
+
+    it('should return 504 on timeout', () => {
+      const middleware = requestTimeout(1000);
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      vi.advanceTimersByTime(1001);
+
+      expect(statusMock).toHaveBeenCalledWith(504);
+      expect(jsonMock).toHaveBeenCalledWith({
+        error: {
+          message: 'Request timeout',
+          type: 'timeout_error',
+          code: 'request_timeout',
+        },
+      });
+    });
+
+    it('should not send response if headers already sent', () => {
+      (mockRes as { headersSent: boolean }).headersSent = true;
+      const middleware = requestTimeout(1000);
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      vi.advanceTimersByTime(1001);
+      expect(statusMock).not.toHaveBeenCalled();
+    });
+
+    it('should clear timeout on finish', () => {
+      const middleware = requestTimeout(1000);
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      finishHandler?.();
+      vi.advanceTimersByTime(1001);
+      expect(statusMock).not.toHaveBeenCalled();
+    });
+
+    it('should clear timeout on close', () => {
+      const middleware = requestTimeout(1000);
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      closeHandler?.();
+      vi.advanceTimersByTime(1001);
+      expect(statusMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('securityHeaders', () => {
+    let mockReq: Partial<Request>;
+    let mockRes: Partial<Response>;
+    let setHeaderMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockReq = {};
+      setHeaderMock = vi.fn();
+      mockRes = {
+        setHeader: setHeaderMock,
+      };
+    });
+
+    it('should set X-Content-Type-Options header', () => {
+      const nextSpy = vi.fn();
+      securityHeaders(mockReq as Request, mockRes as Response, nextSpy);
+
+      expect(setHeaderMock).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
+    });
+
+    it('should set X-Frame-Options header', () => {
+      const nextSpy = vi.fn();
+      securityHeaders(mockReq as Request, mockRes as Response, nextSpy);
+
+      expect(setHeaderMock).toHaveBeenCalledWith('X-Frame-Options', 'DENY');
+    });
+
+    it('should set X-XSS-Protection header', () => {
+      const nextSpy = vi.fn();
+      securityHeaders(mockReq as Request, mockRes as Response, nextSpy);
+
+      expect(setHeaderMock).toHaveBeenCalledWith('X-XSS-Protection', '1; mode=block');
+    });
+
+    it('should set Referrer-Policy header', () => {
+      const nextSpy = vi.fn();
+      securityHeaders(mockReq as Request, mockRes as Response, nextSpy);
+
+      expect(setHeaderMock).toHaveBeenCalledWith('Referrer-Policy', 'strict-origin-when-cross-origin');
+    });
+
+    it('should call next()', () => {
+      const nextSpy = vi.fn();
+      securityHeaders(mockReq as Request, mockRes as Response, nextSpy);
+
+      expect(nextSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('requestId', () => {
+    let mockReq: Partial<Request>;
+    let mockRes: Partial<Response>;
+    let setHeaderMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      mockReq = {
+        headers: {},
+      };
+      setHeaderMock = vi.fn();
+      mockRes = {
+        setHeader: setHeaderMock,
+      };
+    });
+
+    it('should generate a UUID when no X-Request-ID header is provided', () => {
+      const nextSpy = vi.fn();
+      requestId(mockReq as Request, mockRes as Response, nextSpy);
+
+      expect(setHeaderMock).toHaveBeenCalledTimes(1);
+      const [headerName, headerValue] = setHeaderMock.mock.calls[0] as [string, string];
+      expect(headerName).toBe('X-Request-ID');
+      // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      expect(headerValue).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    });
+
+    it('should use existing X-Request-ID header if provided', () => {
+      mockReq.headers = { 'x-request-id': 'existing-request-id-123' };
+      const nextSpy = vi.fn();
+      requestId(mockReq as Request, mockRes as Response, nextSpy);
+
+      expect(setHeaderMock).toHaveBeenCalledWith('X-Request-ID', 'existing-request-id-123');
+    });
+
+    it('should generate new ID if X-Request-ID header is empty string', () => {
+      mockReq.headers = { 'x-request-id': '' };
+      const nextSpy = vi.fn();
+      requestId(mockReq as Request, mockRes as Response, nextSpy);
+
+      const [, headerValue] = setHeaderMock.mock.calls[0] as [string, string];
+      expect(headerValue).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    });
+
+    it('should call next()', () => {
+      const nextSpy = vi.fn();
+      requestId(mockReq as Request, mockRes as Response, nextSpy);
+
+      expect(nextSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

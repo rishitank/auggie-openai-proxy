@@ -8,7 +8,8 @@ const imports: Record<string, { 'auggie-dev': string; default: string }> = pkg.i
 
 // Build a custom resolver that emulates ESM-style subpath imports
 function matchIdentifier(id: string, pattern: string): { match: boolean; capture?: string } {
-  const regexp = new RegExp(`^${pattern.replace('*', '(.*)')}$`);
+  // Use replaceAll to handle all occurrences (satisfies CodeQL security check)
+  const regexp = new RegExp(`^${pattern.replaceAll('*', '(.*)')}$`);
   const match = id.match(regexp);
   return { match: !!match, capture: match?.[1] };
 }
@@ -27,7 +28,8 @@ export default defineConfig({
               // Use the 'auggie-dev' condition for development/testing
               const replacement = mapping['auggie-dev'];
               const resolved = path.resolve(
-                capture ? replacement.replace('*', capture) : replacement
+                // Use replaceAll to handle all occurrences (satisfies CodeQL security check)
+                capture ? replacement.replaceAll('*', capture) : replacement
               );
               return resolved;
             }

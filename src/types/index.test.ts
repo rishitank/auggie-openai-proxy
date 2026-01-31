@@ -13,123 +13,211 @@ import {
   ChatCompletionRequestSchema,
   WebhookRequestSchema,
   WebhookConfigSchema,
+  normalizeMessageContent,
 } from './index';
 
 describe('types', () => {
   describe('Enums', () => {
-    it('should have correct MessageRole values', () => {
-      expect(MessageRole.System).toBe('system');
-      expect(MessageRole.User).toBe('user');
-      expect(MessageRole.Assistant).toBe('assistant');
+    it.each([
+      [MessageRole.System, 'system'],
+      [MessageRole.User, 'user'],
+      [MessageRole.Assistant, 'assistant'],
+      [MessageRole.Developer, 'developer'],
+      [MessageRole.Tool, 'tool'],
+      [MessageRole.Function, 'function'],
+    ])('MessageRole.%s should equal "%s"', (enumValue, expected) => {
+      expect(enumValue).toBe(expected);
     });
 
     it('should have correct ContentType values', () => {
       expect(ContentType.Text).toBe('text');
     });
 
-    it('should have correct FinishReason values', () => {
-      expect(FinishReason.Stop).toBe('stop');
-      expect(FinishReason.Length).toBe('length');
+    it.each([
+      [FinishReason.Stop, 'stop'],
+      [FinishReason.Length, 'length'],
+    ])('FinishReason.%s should equal "%s"', (enumValue, expected) => {
+      expect(enumValue).toBe(expected);
     });
   });
 
   describe('MessageRoleSchema', () => {
-    it('should accept valid roles', () => {
-      expect(MessageRoleSchema.parse('system')).toBe('system');
-      expect(MessageRoleSchema.parse('user')).toBe('user');
-      expect(MessageRoleSchema.parse('assistant')).toBe('assistant');
-    });
+    it.each(['system', 'user', 'assistant', 'developer', 'tool', 'function'])(
+      'should accept valid role: %s',
+      (role) => {
+        expect(MessageRoleSchema.parse(role)).toBe(role);
+      }
+    );
 
-    it('should reject invalid roles', () => {
-      expect(() => MessageRoleSchema.parse('invalid')).toThrow();
-      expect(() => MessageRoleSchema.parse('')).toThrow();
-    });
+    it.each(['invalid', '', 'admin', 'bot', 'AI'])(
+      'should reject invalid role: %s',
+      (role) => {
+        expect(() => MessageRoleSchema.parse(role)).toThrow();
+      }
+    );
   });
 
   describe('OpenAIMessageSchema', () => {
-    it('should accept valid messages', () => {
-      const msg = { role: 'user', content: 'Hello' };
+    describe('valid messages', () => {
+      it.each([
+        ['basic user message', { role: 'user', content: 'Hello' }],
+        ['basic assistant message', { role: 'assistant', content: 'Hi there' }],
+        ['system message', { role: 'system', content: 'You are helpful' }],
+        ['null content (tool call)', { role: 'assistant', content: null }],
+        ['tool message with tool_call_id', { role: 'tool', content: '4', tool_call_id: 'call_abc' }],
+        ['function message with name', { role: 'function', content: '{}', name: 'get_data' }],
+      ])('should accept %s', (_, msg) => {
+        expect(() => OpenAIMessageSchema.parse(msg)).not.toThrow();
+      });
+    });
+
+    it('should preserve extra fields via passthrough', () => {
+      const msg = {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: 'call_123', type: 'function', function: { name: 'calc', arguments: '{}' } }],
+      };
       const result = OpenAIMessageSchema.parse(msg);
-      expect(result.role).toBe('user');
-      expect(result.content).toBe('Hello');
+      expect(result.tool_calls).toHaveLength(1);
     });
 
-    it('should reject missing role', () => {
-      expect(() => OpenAIMessageSchema.parse({ content: 'Hello' })).toThrow();
+    describe('invalid messages', () => {
+      it.each([
+        ['missing role', { content: 'Hello' }],
+        ['missing content', { role: 'user' }],
+        ['empty object', {}],
+      ])('should reject %s', (_, msg) => {
+        expect(() => OpenAIMessageSchema.parse(msg)).toThrow();
+      });
+    });
+  });
+
+  describe('normalizeMessageContent', () => {
+    it.each([
+      ['string content', { role: MessageRole.User, content: 'Hello' }, 'Hello'],
+      ['null content', { role: MessageRole.Assistant, content: null }, ''],
+      ['empty string', { role: MessageRole.User, content: '' }, ''],
+    ])('should normalize %s to expected output', (_, msg, expected) => {
+      const result = normalizeMessageContent(msg);
+      expect(result.content).toBe(expected);
     });
 
-    it('should reject missing content', () => {
-      expect(() => OpenAIMessageSchema.parse({ role: 'user' })).toThrow();
+    it('should join array content parts', () => {
+      const msg = {
+        role: MessageRole.User,
+        content: [
+          { type: 'text' as const, text: 'Hello ' },
+          { type: 'text' as const, text: 'World' },
+        ],
+      };
+      expect(normalizeMessageContent(msg).content).toBe('Hello World');
+    });
+
+    // TDD: Image content should be filtered out gracefully, keeping only text parts
+    describe('image content handling', () => {
+      it('should filter out image_url parts and keep text parts', () => {
+        const msg = {
+          role: MessageRole.User,
+          content: [
+            { type: 'text', text: 'Here is an image: ' },
+            { type: 'image_url', image_url: { url: 'https://example.com/img.jpg' } },
+            { type: 'text', text: ' What do you see?' },
+          ],
+        };
+        const result = normalizeMessageContent(msg as Parameters<typeof normalizeMessageContent>[0]);
+        expect(result.content).toBe('Here is an image:  What do you see?');
+      });
+
+      it('should handle content with only image_url parts', () => {
+        const msg = {
+          role: MessageRole.User,
+          content: [
+            { type: 'image_url', image_url: { url: 'https://example.com/img.jpg' } },
+          ],
+        };
+        const result = normalizeMessageContent(msg as Parameters<typeof normalizeMessageContent>[0]);
+        expect(result.content).toBe('');
+      });
     });
   });
 
   describe('ChatCompletionRequestSchema', () => {
-    it('should accept valid request with defaults', () => {
-      const req = { messages: [{ role: 'user', content: 'Hello' }] };
-      const result = ChatCompletionRequestSchema.parse(req);
+    const baseMessages = [{ role: 'user', content: 'Hello' }];
+
+    it('should apply defaults', () => {
+      const result = ChatCompletionRequestSchema.parse({ messages: baseMessages });
       expect(result.model).toBe('claude-sonnet-4-5');
       expect(result.stream).toBe(false);
-      expect(result.messages).toHaveLength(1);
+      expect(result.n).toBe(1);
     });
 
-    it('should accept request with all fields', () => {
-      const req = {
-        model: 'gpt-5',
-        messages: [{ role: 'user', content: 'Hello' }],
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 100,
-      };
-      const result = ChatCompletionRequestSchema.parse(req);
-      expect(result.model).toBe('gpt-5');
-      expect(result.stream).toBe(true);
-      expect(result.temperature).toBe(0.7);
-      expect(result.max_tokens).toBe(100);
+    describe('temperature validation', () => {
+      it.each([0, 0.5, 1, 1.5, 2])('should accept valid temperature: %s', (temp) => {
+        const result = ChatCompletionRequestSchema.parse({ messages: baseMessages, temperature: temp });
+        expect(result.temperature).toBe(temp);
+      });
+
+      it.each([-0.1, 2.1, 3, -1])('should reject invalid temperature: %s', (temp) => {
+        expect(() => ChatCompletionRequestSchema.parse({ messages: baseMessages, temperature: temp })).toThrow();
+      });
+    });
+
+    describe('max_tokens validation', () => {
+      it.each([1, 100, 4096])('should accept valid max_tokens: %s', (tokens) => {
+        const result = ChatCompletionRequestSchema.parse({ messages: baseMessages, max_tokens: tokens });
+        expect(result.max_tokens).toBe(tokens);
+      });
+
+      it.each([0, -1, -100])('should reject invalid max_tokens: %s', (tokens) => {
+        expect(() => ChatCompletionRequestSchema.parse({ messages: baseMessages, max_tokens: tokens })).toThrow();
+      });
     });
 
     it('should reject empty messages array', () => {
       expect(() => ChatCompletionRequestSchema.parse({ messages: [] })).toThrow();
     });
 
-    it('should reject invalid temperature', () => {
-      const req = { messages: [{ role: 'user', content: 'Hi' }], temperature: 3 };
-      expect(() => ChatCompletionRequestSchema.parse(req)).toThrow();
-    });
+    // TDD: These tests document that extra OpenAI fields should be preserved
+    describe('passthrough for extra OpenAI fields', () => {
+      it.each([
+        ['response_format', { type: 'json_object' }],
+        ['tool_choice', 'auto'],
+        ['parallel_tool_calls', true],
+        ['service_tier', 'default'],
+      ])('should preserve %s field', (field, value) => {
+        const req = { messages: baseMessages, [field]: value };
+        const result = ChatCompletionRequestSchema.parse(req);
+        expect(result[field]).toEqual(value);
+      });
 
-    it('should accept temperature at boundaries', () => {
-      const reqMin = { messages: [{ role: 'user', content: 'Hi' }], temperature: 0 };
-      const reqMax = { messages: [{ role: 'user', content: 'Hi' }], temperature: 2 };
-      expect(ChatCompletionRequestSchema.parse(reqMin).temperature).toBe(0);
-      expect(ChatCompletionRequestSchema.parse(reqMax).temperature).toBe(2);
-    });
+      it('should preserve tools array', () => {
+        const tools = [
+          { type: 'function', function: { name: 'get_weather', parameters: {} } },
+        ];
+        const result = ChatCompletionRequestSchema.parse({ messages: baseMessages, tools });
+        expect(result.tools).toEqual(tools);
+      });
 
-    it('should reject non-positive max_tokens', () => {
-      const reqZero = { messages: [{ role: 'user', content: 'Hi' }], max_tokens: 0 };
-      const reqNeg = { messages: [{ role: 'user', content: 'Hi' }], max_tokens: -1 };
-      expect(() => ChatCompletionRequestSchema.parse(reqZero)).toThrow();
-      expect(() => ChatCompletionRequestSchema.parse(reqNeg)).toThrow();
+      it('should preserve functions array (legacy)', () => {
+        const functions = [{ name: 'get_weather', parameters: {} }];
+        const result = ChatCompletionRequestSchema.parse({ messages: baseMessages, functions });
+        expect(result.functions).toEqual(functions);
+      });
     });
   });
 
   describe('WebhookRequestSchema', () => {
-    it('should accept request with text field', () => {
-      const result = WebhookRequestSchema.parse({ text: 'Hello' });
-      expect(result.text).toBe('Hello');
-    });
-
-    it('should accept request with prompt field', () => {
-      const result = WebhookRequestSchema.parse({ prompt: 'Hello' });
-      expect(result.prompt).toBe('Hello');
-    });
-
-    it('should accept request with message field', () => {
-      const result = WebhookRequestSchema.parse({ message: 'Hello' });
-      expect(result.message).toBe('Hello');
-    });
-
-    it('should accept IFTTT format with value1', () => {
-      const result = WebhookRequestSchema.parse({ value1: 'Hello' });
-      expect(result.value1).toBe('Hello');
+    describe('message field variants', () => {
+      it.each([
+        ['text', { text: 'Hello' }],
+        ['prompt', { prompt: 'Hello' }],
+        ['message', { message: 'Hello' }],
+        ['query', { query: 'Hello' }],
+        ['input', { input: 'Hello' }],
+        ['value1 (IFTTT)', { value1: 'Hello' }],
+      ])('should accept %s field', (_, payload) => {
+        expect(() => WebhookRequestSchema.parse(payload)).not.toThrow();
+      });
     });
 
     it('should accept optional overrides', () => {
@@ -142,14 +230,16 @@ describe('types', () => {
       expect(result.system_prompt).toBe('Be helpful');
     });
 
-    it('should reject request with no message fields', () => {
-      expect(() => WebhookRequestSchema.parse({})).toThrow();
-      expect(() => WebhookRequestSchema.parse({ model: 'gpt-5' })).toThrow();
-    });
+    it.each([{}, { model: 'gpt-5' }, { temperature: 0.5 }])(
+      'should reject request without message field: %o',
+      (payload) => {
+        expect(() => WebhookRequestSchema.parse(payload)).toThrow();
+      }
+    );
   });
 
   describe('WebhookConfigSchema', () => {
-    it('should accept minimal config', () => {
+    it('should apply defaults for minimal config', () => {
       const result = WebhookConfigSchema.parse({ name: 'test' });
       expect(result.name).toBe('test');
       expect(result.enabled).toBe(true);
@@ -166,8 +256,7 @@ describe('types', () => {
         model: 'gpt-5',
         systemPrompt: 'Be helpful',
       };
-      const result = WebhookConfigSchema.parse(config);
-      expect(result).toMatchObject(config);
+      expect(WebhookConfigSchema.parse(config)).toMatchObject(config);
     });
 
     it('should reject config without name', () => {

@@ -145,8 +145,10 @@ describe('handlers/webhook', () => {
       expect(calls.length).toBeGreaterThan(0);
       const firstCall = calls[0];
       assertDefined(firstCall);
-      const errorResponse = firstCall[0] as { error: string };
-      expect(errorResponse.error).toContain('not found');
+      const errorResponse = firstCall[0] as { error: { message: string; type: string; code: string } };
+      expect(errorResponse.error.message).toContain('not found');
+      expect(errorResponse.error.type).toBe('not_found_error');
+      expect(errorResponse.error.code).toBe('webhook_not_found');
     });
 
     it('should return 503 for disabled webhook', async () => {

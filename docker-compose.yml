@@ -1,0 +1,12 @@
+services:
+  auggie-openai-proxy:
+    build: .
+    image: auggie-openai-proxy:latest
+    container_name: auggie-openai-proxy
+    ports:
+      - "3456:3456"
+    volumes:
+      # Mount Augment credentials (read-only)
+      - ~/.augment:/home/auggie/.augment:ro
+    restart: unless-stopped
+

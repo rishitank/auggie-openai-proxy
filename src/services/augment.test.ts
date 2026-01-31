@@ -87,6 +87,37 @@ describe('services/augment', () => {
           uninitializedService.generateCompletion(messages, 'claude-sonnet-4-5')
         ).rejects.toThrow('not initialized');
       });
+
+      it('should accept generation options with maxOutputTokens', async () => {
+        const messages = [{ role: MessageRole.User, content: 'Hello' }];
+
+        const result = await service.generateCompletion(messages, 'claude-sonnet-4-5', {
+          maxOutputTokens: 100,
+        });
+
+        expect(result.text).toBe('Generated response');
+      });
+
+      it('should accept generation options with stopSequences', async () => {
+        const messages = [{ role: MessageRole.User, content: 'Hello' }];
+
+        const result = await service.generateCompletion(messages, 'claude-sonnet-4-5', {
+          stopSequences: ['END', 'STOP'],
+        });
+
+        expect(result.text).toBe('Generated response');
+      });
+
+      it('should accept generation options with both maxOutputTokens and stopSequences', async () => {
+        const messages = [{ role: MessageRole.User, content: 'Hello' }];
+
+        const result = await service.generateCompletion(messages, 'claude-sonnet-4-5', {
+          maxOutputTokens: 500,
+          stopSequences: ['END'],
+        });
+
+        expect(result.text).toBe('Generated response');
+      });
     });
 
     describe('streamCompletion', () => {

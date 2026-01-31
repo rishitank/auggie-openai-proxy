@@ -4,7 +4,7 @@
  * Verifies configuration loading and validation
  */
 
-import { loadConfig, AVAILABLE_MODELS } from './config';
+import { loadConfig, AVAILABLE_MODELS, validateEnvironment, resolveModelAlias, MODEL_ALIASES } from './config';
 
 describe('config', () => {
   const originalEnv = process.env;
@@ -167,6 +167,108 @@ describe('config', () => {
     it('should be a readonly array', () => {
       expect(Array.isArray(AVAILABLE_MODELS)).toBe(true);
       expect(AVAILABLE_MODELS.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('MODEL_ALIASES', () => {
+    it.each([
+      ['gpt-4o', 'gpt-5'],
+      ['gpt-4o-mini', 'gpt-5'],
+      ['gpt-4-turbo', 'gpt-5'],
+      ['gpt-4', 'gpt-5'],
+      ['gpt-3.5-turbo', 'gpt-5'],
+      ['claude-3-opus-20240229', 'claude-opus-4-5'],
+      ['claude-3-sonnet-20240229', 'claude-sonnet-4-5'],
+      ['claude-3-haiku-20240307', 'claude-haiku-4-5'],
+      ['claude-3-5-sonnet-20240620', 'claude-sonnet-4-5'],
+      ['claude-3-5-haiku-20241022', 'claude-haiku-4-5'],
+    ])('should map %s to %s', (alias, expected) => {
+      expect(MODEL_ALIASES[alias]).toBe(expected);
+    });
+  });
+
+  describe('resolveModelAlias', () => {
+    it.each([
+      ['gpt-4o', 'gpt-5'],
+      ['gpt-4-turbo', 'gpt-5'],
+      ['claude-3-opus-20240229', 'claude-opus-4-5'],
+      ['claude-3-sonnet-20240229', 'claude-sonnet-4-5'],
+    ])('should resolve alias %s to %s', (input, expected) => {
+      expect(resolveModelAlias(input)).toBe(expected);
+    });
+
+    it.each([
+      ['claude-sonnet-4-5', 'claude-sonnet-4-5'],
+      ['claude-opus-4-5', 'claude-opus-4-5'],
+      ['gpt-5', 'gpt-5'],
+      ['claude-haiku-4-5', 'claude-haiku-4-5'],
+    ])('should pass through available model %s unchanged', (input, expected) => {
+      expect(resolveModelAlias(input)).toBe(expected);
+    });
+
+    it('should return undefined for unknown model with no alias', () => {
+      expect(resolveModelAlias('unknown-model')).toBeUndefined();
+    });
+  });
+
+  describe('validateEnvironment', () => {
+    it('should return empty array when AUGMENT_API_TOKEN is set', () => {
+      process.env.AUGMENT_API_TOKEN = 'test-token';
+      delete process.env.CONTEXT_ENABLED;
+
+      const warnings = validateEnvironment();
+
+      expect(warnings).toEqual([]);
+    });
+
+    it('should not warn about credentials when token is set', () => {
+      process.env.AUGMENT_API_TOKEN = 'test-token';
+      delete process.env.CONTEXT_ENABLED;
+
+      const warnings = validateEnvironment();
+
+      const credentialWarning = warnings.find((w) => w.includes('No Augment credentials'));
+      expect(credentialWarning).toBeUndefined();
+    });
+
+    it('should warn when CONTEXT_ENABLED but no workspace dir', () => {
+      process.env.AUGMENT_API_TOKEN = 'test-token';
+      process.env.CONTEXT_ENABLED = 'true';
+      delete process.env.CONTEXT_WORKSPACE_DIR;
+
+      const warnings = validateEnvironment();
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('CONTEXT_ENABLED=true but CONTEXT_WORKSPACE_DIR not set');
+    });
+
+    it('should not warn when CONTEXT_ENABLED with workspace dir', () => {
+      process.env.AUGMENT_API_TOKEN = 'test-token';
+      process.env.CONTEXT_ENABLED = 'true';
+      process.env.CONTEXT_WORKSPACE_DIR = '/path/to/workspace';
+
+      const warnings = validateEnvironment();
+
+      expect(warnings).toEqual([]);
+    });
+
+    it('should not warn about context when CONTEXT_ENABLED is not true', () => {
+      process.env.AUGMENT_API_TOKEN = 'test-token';
+      process.env.CONTEXT_ENABLED = 'false';
+      delete process.env.CONTEXT_WORKSPACE_DIR;
+
+      const warnings = validateEnvironment();
+
+      expect(warnings).toEqual([]);
+    });
+
+    it('should return array type', () => {
+      process.env.AUGMENT_API_TOKEN = 'test-token';
+      delete process.env.CONTEXT_ENABLED;
+
+      const warnings = validateEnvironment();
+
+      expect(Array.isArray(warnings)).toBe(true);
     });
   });
 });

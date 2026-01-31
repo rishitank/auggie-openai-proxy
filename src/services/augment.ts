@@ -28,6 +28,12 @@ interface ChatMessage {
   readonly content: string;
 }
 
+/** Options for generation requests */
+export interface GenerationOptions {
+  readonly maxOutputTokens?: number;
+  readonly stopSequences?: string[];
+}
+
 /** LanguageModelV2 message types */
 interface SystemMessage {
   role: MessageRole.System;
@@ -60,6 +66,14 @@ const toLanguageModelMessage = (msg: ChatMessage): LMV2Message => {
     case MessageRole.Assistant:
       return {
         role: MessageRole.Assistant,
+        content: [{ type: ContentType.Text, text: msg.content }],
+      };
+    case MessageRole.Tool:
+    case MessageRole.Function:
+      // Tool/function messages should be filtered out before reaching here
+      // Fall through to user message as a safe default
+      return {
+        role: MessageRole.User,
         content: [{ type: ContentType.Text, text: msg.content }],
       };
   }
@@ -118,13 +132,23 @@ export class AugmentService {
    */
   async generateCompletion(
     messages: readonly ChatMessage[],
-    modelName: string
+    modelName: string,
+    options?: GenerationOptions
   ): Promise<ChatCompletionResult> {
     const model = this.createModel(modelName);
     const prompt = messages.map(toLanguageModelMessage);
 
+    // Build generation options
+    const generateOptions: { prompt: typeof prompt; maxOutputTokens?: number; stopSequences?: string[] } = { prompt };
+    if (options?.maxOutputTokens !== undefined) {
+      generateOptions.maxOutputTokens = options.maxOutputTokens;
+    }
+    if (options?.stopSequences !== undefined && options.stopSequences.length > 0) {
+      generateOptions.stopSequences = options.stopSequences;
+    }
+
     // Call doGenerate directly on the language model
-    const result = await model.doGenerate({ prompt });
+    const result = await model.doGenerate(generateOptions);
 
     // Extract text from content array
     const textContent = result.content
@@ -152,13 +176,23 @@ export class AugmentService {
    */
   async *streamCompletion(
     messages: readonly ChatMessage[],
-    modelName: string
+    modelName: string,
+    options?: GenerationOptions
   ): AsyncGenerator<string, void, undefined> {
     const model = this.createModel(modelName);
     const prompt = messages.map(toLanguageModelMessage);
 
+    // Build stream options
+    const streamOptions: { prompt: typeof prompt; maxOutputTokens?: number; stopSequences?: string[] } = { prompt };
+    if (options?.maxOutputTokens !== undefined) {
+      streamOptions.maxOutputTokens = options.maxOutputTokens;
+    }
+    if (options?.stopSequences !== undefined && options.stopSequences.length > 0) {
+      streamOptions.stopSequences = options.stopSequences;
+    }
+
     // Call doStream directly on the language model
-    const { stream } = await model.doStream({ prompt });
+    const { stream } = await model.doStream(streamOptions);
 
     const reader = stream.getReader();
 

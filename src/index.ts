@@ -16,13 +16,15 @@
  * - DRY: Shared types and utilities
  */
 
+import compression from 'compression';
 import express, { type Request, type Response } from 'express';
-import { loadConfig } from '#config';
+import { loadConfig, validateEnvironment } from '#config';
 import { VERSION, NAME } from '#version';
-import { initializeAugment } from '#services/augment';
+import { initializeAugment, getAugmentService } from '#services/augment';
 import { initializeContextService, getContextService } from '#services/context';
 import { handleChatCompletion, handleModelsList, handleWebhook, listWebhooks } from '#handlers/index';
-import { errorHandler, requestLogger } from '#middleware/index';
+import { errorHandler, requestLogger, requestTimeout, cors, metricsRecorder, securityHeaders, requestId } from '#middleware';
+import { getPrometheusMetrics } from '#services/metrics';
 
 // =============================================================================
 // Application Setup
@@ -32,8 +34,14 @@ const config = loadConfig();
 const app = express();
 
 // Middleware
+app.use(securityHeaders);
+app.use(requestId);
+app.use(cors);
+app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(requestLogger);
+app.use(metricsRecorder);
+app.use(requestTimeout());
 
 // =============================================================================
 // Routes
@@ -41,12 +49,27 @@ app.use(requestLogger);
 
 /** Health check endpoint */
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({
-    status: 'healthy',
+  const contextService = getContextService();
+  const augmentReady = getAugmentService().isInitialized;
+  const contextReady = contextService.isReady();
+  const allHealthy = augmentReady;
+
+  res.status(allHealthy ? 200 : 503).json({
+    status: allHealthy ? 'healthy' : 'degraded',
     service: NAME,
     version: VERSION,
     timestamp: new Date().toISOString(),
+    checks: {
+      augment: augmentReady ? 'ok' : 'not initialized',
+      context: contextReady ? 'ok' : 'disabled',
+    },
   });
+});
+
+/** Prometheus metrics endpoint */
+app.get('/metrics', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4');
+  res.send(getPrometheusMetrics());
 });
 
 /** OpenAI-compatible endpoints */
@@ -66,6 +89,12 @@ app.use(errorHandler);
 
 async function main(): Promise<void> {
   try {
+    // Validate environment
+    const warnings = validateEnvironment();
+    for (const warning of warnings) {
+      console.warn(`⚠️  ${warning}`);
+    }
+
     console.log('🚀 Initializing Auggie SDK...');
     await initializeAugment();
     console.log('✅ Auggie SDK initialized');
@@ -84,7 +113,7 @@ async function main(): Promise<void> {
       : '⏸️  Context disabled';
     console.log(contextStatus);
 
-    app.listen(config.port, config.host, () => {
+    const server = app.listen(config.port, config.host, () => {
       console.log(`\n🎉 Auggie OpenAI Proxy v${VERSION}`);
       console.log(`   Running at http://${config.host}:${String(config.port)}`);
       console.log(`\n📡 Endpoints:`);
@@ -103,6 +132,28 @@ async function main(): Promise<void> {
       console.log(`   baseUrl: "http://${config.host}:${String(config.port)}/v1"`);
       console.log(`   api: "openai-completions"`);
       console.log(`   models: claude-sonnet-4-5, claude-opus-4-5, claude-haiku-4-5, gpt-5\n`);
+    });
+
+    // Graceful shutdown handler
+    const shutdown = (signal: string): void => {
+      console.log(`\n⏳ Received ${signal}, shutting down gracefully...`);
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+
+      // Force exit after 10 seconds if connections don't close
+      setTimeout(() => {
+        console.error('⚠️  Forced shutdown after timeout');
+        process.exit(1);
+      }, 10000).unref();
+    };
+
+    process.on('SIGTERM', () => {
+      shutdown('SIGTERM');
+    });
+    process.on('SIGINT', () => {
+      shutdown('SIGINT');
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

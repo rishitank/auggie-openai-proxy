@@ -10,6 +10,7 @@ An OpenAI-compatible API proxy that exposes [Augment Code's](https://www.augment
 - **Multiple Models** - Access Claude Sonnet/Haiku/Opus 4.5, GPT-5 (see [Available Models](#-available-models))
 - **Request Validation** - [Zod](https://zod.dev/) schemas for runtime type safety
 - **Named Webhooks** - Provider-agnostic webhooks for [IFTTT](https://ifttt.com/), [Zapier](https://zapier.com/), [Make](https://www.make.com/), and custom integrations
+- **Production Ready** - CORS, compression, request timeout, metrics, graceful shutdown
 
 ## 🏗️ Architecture
 
@@ -197,19 +198,52 @@ response = llm.invoke("Hello!")
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check |
+| GET | `/health` | Health check with service status |
+| GET | `/metrics` | Prometheus-compatible metrics |
 | GET | `/v1/models` | List available models |
 | POST | `/v1/chat/completions` | Chat completions (OpenAI format) |
 | GET | `/webhooks` | List all configured webhooks |
 | POST | `/webhook/:name` | Call a named webhook |
 
+### Health Check
+
+The `/health` endpoint returns detailed service status:
+
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "augment": "ok",
+    "context": "ok"
+  }
+}
+```
+
+Returns `200` when healthy, `503` when degraded.
+
+### Metrics
+
+The `/metrics` endpoint returns Prometheus-compatible metrics:
+
+```
+auggie_requests_total 42
+auggie_errors_total 2
+auggie_uptime_seconds 3600
+auggie_requests_by_endpoint_total{endpoint="POST /v1/chat/completions"} 40
+auggie_requests_by_status_total{status="200"} 40
+```
+
 ## 🔗 Named Webhooks
+
+> **Note**: Webhooks are designed for **standalone use** with automation platforms (IFTTT, Zapier, Make). If you're using [clawdbot](https://github.com/anthropics/clawdbot), you don't need webhooks—clawdbot provides built-in session memory, rate limiting, multi-channel support (WhatsApp, Telegram, Slack, Discord), and authentication.
 
 Configure **multiple webhooks**, each with its own model, system prompt, and LLM backend. Perfect for:
 
 - **Different assistants** - Personal vs work, concise vs detailed
 - **Different models** - Fast (Haiku) vs powerful (Opus)
 - **Different backends** - Augment, OpenAI, Ollama, LM Studio
+
+**Limitations**: Webhooks are stateless (no conversation memory) and have no built-in authentication. For conversational AI with session persistence, use clawdbot instead.
 
 ### Configuration
 
@@ -368,14 +402,47 @@ Add an "assistant" webhook to your `WEBHOOKS` config:
 3. URL: `https://your-server.com/webhook/coding`
 4. Body: `{ "text": "Your prompt here" }`
 
+## 🛡️ Production Features
+
+The proxy includes several production-ready features:
+
+| Feature | Description |
+|---------|-------------|
+| **CORS** | Cross-Origin Resource Sharing enabled for browser clients |
+| **Compression** | Gzip compression for responses |
+| **Request Timeout** | 2-minute timeout for non-streaming requests (prevents hung connections) |
+| **Graceful Shutdown** | Handles SIGTERM/SIGINT for container orchestration |
+| **Request Tracking** | `X-Request-ID` header for debugging and tracing |
+| **Security Headers** | `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection` |
+
 ## 🐳 Docker
 
-```bash
-# Build using Node version from .nvmrc
-docker build -t auggie-openai-proxy --build-arg NODE_VERSION=$(cat .nvmrc) .
+### Using Docker Compose (Recommended)
 
-# Run
-docker run -p 3456:3456 -e AUGMENT_API_TOKEN=xxx auggie-openai-proxy
+```bash
+# Build and run (mounts ~/.augment automatically)
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
+```
+
+### Manual Docker
+
+```bash
+# Build
+docker build -t auggie-openai-proxy .
+
+# Run (mount Augment credentials)
+docker run -d \
+  --name auggie-openai-proxy \
+  -p 3456:3456 \
+  -v ~/.augment:/home/auggie/.augment:ro \
+  --restart unless-stopped \
+  auggie-openai-proxy
 ```
 
 ## 📋 Available Models
