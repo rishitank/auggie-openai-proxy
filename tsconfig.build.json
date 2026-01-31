@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node", "express", "compression"]
   },
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
