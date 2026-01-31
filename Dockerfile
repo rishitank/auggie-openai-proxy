@@ -13,12 +13,14 @@ COPY tsconfig.json tsup.config.ts ./
 # --ignore-scripts prevents husky from running during build
 RUN npm ci --ignore-scripts
 
+# Add node_modules/.bin to PATH for build commands
+ENV PATH="/app/node_modules/.bin:$PATH"
+
 # Copy source code
 COPY src ./src
 
 # Build TypeScript (type checking is done in CI, not here)
-# Use npx to run tsup since --ignore-scripts doesn't set up node_modules/.bin
-RUN npx tsup
+RUN tsup
 
 # Production stage - minimal runtime image
 ARG NODE_VERSION=25
