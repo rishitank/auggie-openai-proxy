@@ -158,9 +158,9 @@ llm = ChatOpenAI(
 response = llm.invoke("Hello!")
 ```
 
-### [Moltbot](https://www.molt.bot/)
+### [OpenClaw](https://github.com/openclaw/openclaw)
 
-[Moltbot](https://www.molt.bot/) is a personal AI assistant that supports OpenAI-compatible APIs. Add to your `~/.clawdbot/clawdbot.json`:
+[OpenClaw](https://github.com/openclaw/openclaw) is a personal AI assistant that supports OpenAI-compatible APIs. Add to your `~/.openclaw/openclaw.json`:
 
 ```json
 {
@@ -235,7 +235,7 @@ auggie_requests_by_status_total{status="200"} 40
 
 ## 🔗 Named Webhooks
 
-> **Note**: Webhooks are designed for **standalone use** with automation platforms (IFTTT, Zapier, Make). If you're using [clawdbot](https://github.com/anthropics/clawdbot), you don't need webhooks—clawdbot provides built-in session memory, rate limiting, multi-channel support (WhatsApp, Telegram, Slack, Discord), and authentication.
+> **Note**: Webhooks are designed for **standalone use** with automation platforms (IFTTT, Zapier, Make). If you're using [OpenClaw](https://github.com/openclaw/openclaw), you don't need webhooks—OpenClaw provides built-in session memory, rate limiting, multichannel support (WhatsApp, Telegram, Slack, Discord), and authentication.
 
 Configure **multiple webhooks**, each with its own model, system prompt, and LLM backend. Perfect for:
 
@@ -243,7 +243,7 @@ Configure **multiple webhooks**, each with its own model, system prompt, and LLM
 - **Different models** - Fast (Haiku) vs powerful (Opus)
 - **Different backends** - Augment, OpenAI, Ollama, LM Studio
 
-**Limitations**: Webhooks are stateless (no conversation memory) and have no built-in authentication. For conversational AI with session persistence, use clawdbot instead.
+**Limitations**: Webhooks are stateless (no conversation memory) and have no built-in authentication. For conversational AI with session persistence, use [OpenClaw](https://github.com/openclaw/openclaw) instead.
 
 ### Configuration
 
