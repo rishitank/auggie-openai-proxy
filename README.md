@@ -235,7 +235,7 @@ auggie_requests_by_status_total{status="200"} 40
 
 ## 🔗 Named Webhooks
 
-> **Note**: Webhooks are designed for **standalone use** with automation platforms (IFTTT, Zapier, Make). If you're using [OpenClaw](https://github.com/openclaw/openclaw), you don't need webhooks—OpenClaw provides built-in session memory, rate limiting, multi-channel support (WhatsApp, Telegram, Slack, Discord), and authentication.
+> **Note**: Webhooks are designed for **standalone use** with automation platforms (IFTTT, Zapier, Make). If you're using [OpenClaw](https://github.com/openclaw/openclaw), you don't need webhooks—OpenClaw provides built-in session memory, rate limiting, multichannel support (WhatsApp, Telegram, Slack, Discord), and authentication.
 
 Configure **multiple webhooks**, each with its own model, system prompt, and LLM backend. Perfect for:
 
