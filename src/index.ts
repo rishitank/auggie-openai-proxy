@@ -150,9 +150,13 @@ async function main(): Promise<void> {
       console.log(`   GET  /webhooks            - List configured webhooks`);
       console.log(`   POST /webhook/:name       - Call a named webhook`);
       console.log(`\n🔧 Context Enhancement: ${contextService.isReady() ? 'ENABLED' : 'DISABLED'}`);
-      const apiKeysEnabled = process.env.API_KEYS !== undefined && process.env.API_KEYS !== '';
-      console.log(`🔐 API Key Auth: ${apiKeysEnabled ? 'ENABLED' : 'DISABLED (open access)'}`);
-      console.log(`⏱️  Rate Limiting: ENABLED (100 req/min default)`);
+      const apiKeysConfigured = process.env.API_KEYS !== undefined && process.env.API_KEYS.trim() !== '';
+      console.log(`🔐 API Key Auth: ${apiKeysConfigured ? 'ENABLED' : 'DISABLED (open access)'}`);
+      // Read rate limit config from env (same defaults as middleware)
+      const rlWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS ?? '60000');
+      const rlMaxRequests = Number(process.env.RATE_LIMIT_MAX_REQUESTS ?? '100');
+      const rlWindowSec = Math.round(rlWindowMs / 1000);
+      console.log(`⏱️  Rate Limiting: ENABLED (${String(rlMaxRequests)} req/${String(rlWindowSec)}s)`);
       console.log(`\n🔗 Webhooks: ${String(config.webhooks.length)} configured`);
       for (const wh of config.webhooks) {
         const status = wh.enabled ? '✅' : '⏸️';

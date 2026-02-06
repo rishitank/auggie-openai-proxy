@@ -399,6 +399,38 @@ describe('middleware', () => {
       expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', expect.any(Number));
       expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Reset', expect.any(Number));
     });
+
+    it('should return 429 when rate limit is exceeded', async () => {
+      vi.resetModules();
+      const { rateLimiter } = await import('./index');
+      const nextSpy = vi.fn();
+      // Create limiter with max 1 request
+      const limiter = rateLimiter({ maxRequests: 1, windowMs: 60000 });
+
+      // First request should succeed
+      limiter(mockReq as Request, mockRes.asResponse(), nextSpy);
+      expect(nextSpy).toHaveBeenCalledTimes(1);
+
+      // Reset mocks for second request
+      nextSpy.mockClear();
+      mockRes = createMockResponse();
+
+      // Second request should be rate limited
+      limiter(mockReq as Request, mockRes.asResponse(), nextSpy);
+
+      expect(nextSpy).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(429);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.objectContaining({
+            type: 'rate_limit_error',
+            code: 'rate_limit_exceeded',
+          }) as Record<string, unknown>,
+        }) as Record<string, unknown>
+      );
+      // Verify Retry-After header is set
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Retry-After', expect.any(String) as string);
+    });
   });
 
   describe('apiKeyAuth', () => {

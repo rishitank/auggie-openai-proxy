@@ -231,10 +231,28 @@ describe('handlers/chat', () => {
 
       expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
       expect(writeMock).toHaveBeenCalled();
-      // Verify that usage is included in one of the chunks
+
+      // Parse SSE chunks and verify usage structure in final chunk
       const calls = writeMock.mock.calls;
-      const allData = calls.map((c: unknown[]) => String(c[0])).join('');
-      expect(allData).toContain('prompt_tokens');
+      const sseChunks = calls
+        .map((c: unknown[]) => String(c[0]))
+        .filter((s: string) => s.startsWith('data: ') && !s.includes('[DONE]'))
+        .map((s: string) => JSON.parse(s.replace('data: ', '').trim()) as Record<string, unknown>);
+
+      // Intermediate chunks should have usage: null per OpenAI spec
+      const intermediateChunks = sseChunks.slice(0, -1);
+      for (const chunk of intermediateChunks) {
+        expect(chunk.usage).toBeNull();
+      }
+
+      // Final chunk should have actual usage data
+      const finalChunk = sseChunks[sseChunks.length - 1];
+      expect(finalChunk).toBeDefined();
+      expect(finalChunk?.usage).toBeDefined();
+      const usage = finalChunk?.usage as Record<string, unknown>;
+      expect(usage.prompt_tokens).toBe(10);
+      expect(usage.completion_tokens).toBe(5);
+      expect(usage.total_tokens).toBe(15);
     });
 
     it('should accept request with user identifier', async () => {
