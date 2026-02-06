@@ -42,9 +42,10 @@ vi.mock('#services/augment', () => ({
       yield '!';
     }),
     streamCompletionWithUsage: vi.fn().mockImplementation(async function* () {
-      yield await Promise.resolve({ type: 'text', text: 'Hello' });
-      yield await Promise.resolve({ type: 'text', text: '!' });
-      yield await Promise.resolve({ type: 'finish', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } });
+      await Promise.resolve(); // Satisfy require-await for async generator
+      yield { type: 'text' as const, text: 'Hello' };
+      yield { type: 'text' as const, text: '!' };
+      yield { type: 'finish' as const, usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } };
     }),
   })),
 }));
@@ -612,7 +613,7 @@ describe('handlers/chat', () => {
       it('should call enhancePrompt when context service is ready', async () => {
         // Mock context service as ready with content enhancement
         const contextMock = await import('#services/context');
-        const enhancePromptMock = vi.fn((msg: string) => `Enhanced: ${msg}`);
+        const enhancePromptMock = vi.fn((msg: string) => Promise.resolve(`Enhanced: ${msg}`));
         vi.mocked(contextMock.getContextService).mockReturnValueOnce({
           isReady: vi.fn(() => true),
           enhancePrompt: enhancePromptMock,
@@ -638,7 +639,7 @@ describe('handlers/chat', () => {
 
       it('should call enhancePrompt even when it returns same content', async () => {
         const contextMock = await import('#services/context');
-        const enhancePromptMock = vi.fn((msg: string) => msg); // Returns same content
+        const enhancePromptMock = vi.fn((msg: string) => Promise.resolve(msg)); // Returns same content
         vi.mocked(contextMock.getContextService).mockReturnValueOnce({
           isReady: vi.fn(() => true),
           enhancePrompt: enhancePromptMock,
@@ -664,7 +665,7 @@ describe('handlers/chat', () => {
 
       it('should not call enhancePrompt when no user messages exist', async () => {
         const contextMock = await import('#services/context');
-        const enhancePromptMock = vi.fn((msg: string) => `Enhanced: ${msg}`);
+        const enhancePromptMock = vi.fn((msg: string) => Promise.resolve(`Enhanced: ${msg}`));
         vi.mocked(contextMock.getContextService).mockReturnValueOnce({
           isReady: vi.fn(() => true),
           enhancePrompt: enhancePromptMock,

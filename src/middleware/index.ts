@@ -13,7 +13,7 @@
  * - errorHandler: Error formatting
  */
 
-import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
+import { randomUUID, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import type { OpenAIErrorResponse } from '#types';
 import { recordRequest, recordLatency } from '#services/metrics';
@@ -303,6 +303,7 @@ const hashKey = (key: string): string =>
 /**
  * Extract client identifier for rate limiting
  * Uses API key hash if present, otherwise falls back to IP
+ * Uses req.ip which respects Express trust proxy settings
  */
 const getClientId = (req: Request): string => {
   const authHeader = req.headers.authorization;
@@ -311,10 +312,8 @@ const getClientId = (req: Request): string => {
     const key = authHeader.slice(7);
     return `key:sha256:${hashKey(key)}`;
   }
-  // Fall back to IP address
-  const forwarded = req.headers['x-forwarded-for'];
-  const ip = typeof forwarded === 'string' ? forwarded.split(',')[0]?.trim() : req.ip;
-  return `ip:${ip ?? 'unknown'}`;
+  // Fall back to IP address (Express handles X-Forwarded-For via trust proxy)
+  return `ip:${req.ip ?? 'unknown'}`;
 };
 
 /**
@@ -348,6 +347,9 @@ export const rateLimiter = (config: RateLimitConfig = DEFAULT_RATE_LIMIT) => {
     if (entry.count > config.maxRequests) {
       const requestId = res.getHeader(HEADER_REQUEST_ID) as string | undefined;
       logger.warn({ requestId, clientId }, 'Rate limit exceeded');
+
+      // Set Retry-After header for clients/proxies to honor backoff
+      res.setHeader('Retry-After', String(resetSeconds));
 
       const response: OpenAIErrorResponse = {
         error: {
@@ -389,23 +391,19 @@ const getApiKeys = (): Set<string> => {
   return cachedApiKeys;
 };
 
+// Random key generated once at module load for HMAC-based comparison
+// This ensures timing-safe comparison without length-dependent branches
+const hmacKey = randomBytes(32);
+
 /**
- * Constant-time comparison of two strings.
- * Prevents timing attacks by always comparing the same number of bytes.
+ * Constant-time comparison of two strings using HMAC.
+ * Creates fixed-length digests to prevent timing attacks from length differences.
  */
 const timingSafeCompare = (a: string, b: string): boolean => {
-  const bufA = Buffer.from(a, 'utf8');
-  const bufB = Buffer.from(b, 'utf8');
-
-  // If lengths differ, we still need constant-time behavior
-  // Compare against a buffer of the same length as bufA to avoid timing leaks
-  if (bufA.length !== bufB.length) {
-    // Always perform a comparison to maintain constant time
-    timingSafeEqual(bufA, bufA);
-    return false;
-  }
-
-  return timingSafeEqual(bufA, bufB);
+  // HMAC produces fixed-length output regardless of input length
+  const hmacA = createHmac('sha256', hmacKey).update(a).digest();
+  const hmacB = createHmac('sha256', hmacKey).update(b).digest();
+  return timingSafeEqual(hmacA, hmacB);
 };
 
 /**

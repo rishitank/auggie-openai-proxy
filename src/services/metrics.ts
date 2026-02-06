@@ -166,9 +166,15 @@ export const getPrometheusMetrics = (): string => {
 
 /**
  * Get metrics as JSON (for debugging)
+ * Returns a deep copy to prevent mutation of internal state
  */
 export const getMetricsJson = (): Metrics & { uptimeSeconds: number } => ({
   ...metrics,
+  requestsByEndpoint: { ...metrics.requestsByEndpoint },
+  requestsByStatus: { ...metrics.requestsByStatus },
+  latencyByEndpoint: Object.fromEntries(
+    Object.entries(metrics.latencyByEndpoint).map(([k, v]) => [k, { ...v, buckets: { ...v.buckets } }]),
+  ),
   uptimeSeconds: Math.floor((Date.now() - metrics.startTime) / 1000),
 });
 

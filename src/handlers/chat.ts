@@ -316,17 +316,15 @@ export const handleChatCompletion = async (
         if (chunk.type === 'text') {
           res.write(toSSE(buildStreamChunk(ctx, chunk.text, model)));
         } else if (includeUsage) {
-          // chunk.type === 'finish' - Capture usage from finish chunk
+          // chunk.type === 'finish' - Always include usage when requested, with fallback to zeros
           const { inputTokens, outputTokens, totalTokens } = chunk.usage;
-          if (inputTokens !== undefined || outputTokens !== undefined) {
-            streamingUsage = {
-              prompt_tokens: inputTokens ?? 0,
-              completion_tokens: outputTokens ?? 0,
-              total_tokens: totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0),
-              prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0 },
-              completion_tokens_details: { reasoning_tokens: 0, audio_tokens: 0, accepted_prediction_tokens: 0, rejected_prediction_tokens: 0 },
-            };
-          }
+          streamingUsage = {
+            prompt_tokens: inputTokens ?? 0,
+            completion_tokens: outputTokens ?? 0,
+            total_tokens: totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0),
+            prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0 },
+            completion_tokens_details: { reasoning_tokens: 0, audio_tokens: 0, accepted_prediction_tokens: 0, rejected_prediction_tokens: 0 },
+          };
         }
       }
 
