@@ -13,7 +13,7 @@
  * - errorHandler: Error formatting
  */
 
-import { randomUUID, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import type { OpenAIErrorResponse } from '#types';
 import { recordRequest, recordLatency } from '#services/metrics';
@@ -391,19 +391,33 @@ const getApiKeys = (): Set<string> => {
   return cachedApiKeys;
 };
 
-// Random key generated once at module load for HMAC-based comparison
-// This ensures timing-safe comparison without length-dependent branches
-const hmacKey = randomBytes(32);
-
 /**
- * Constant-time comparison of two strings using HMAC.
- * Creates fixed-length digests to prevent timing attacks from length differences.
+ * Constant-time comparison of two strings.
+ * Uses buffer padding to ensure fixed-length comparison for timingSafeEqual.
+ * This prevents timing attacks from both length differences and early return.
+ *
+ * Note: This is NOT password hashing - we're comparing API keys in constant time.
+ * API keys are stored in environment variables, not hashed for storage.
  */
 const timingSafeCompare = (a: string, b: string): boolean => {
-  // HMAC produces fixed-length output regardless of input length
-  const hmacA = createHmac('sha256', hmacKey).update(a).digest();
-  const hmacB = createHmac('sha256', hmacKey).update(b).digest();
-  return timingSafeEqual(hmacA, hmacB);
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+
+  // Use the maximum length for consistent comparison time
+  const maxLen = Math.max(bufA.length, bufB.length, 1);
+
+  // Create padded buffers of equal length (zero-padded)
+  const paddedA = Buffer.alloc(maxLen);
+  const paddedB = Buffer.alloc(maxLen);
+  bufA.copy(paddedA);
+  bufB.copy(paddedB);
+
+  // Compare padded buffers in constant time, then check length equality
+  // Both operations must succeed for a valid match
+  const contentsMatch = timingSafeEqual(paddedA, paddedB);
+  const lengthsMatch = bufA.length === bufB.length;
+
+  return contentsMatch && lengthsMatch;
 };
 
 /**
