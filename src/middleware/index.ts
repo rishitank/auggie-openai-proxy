@@ -390,14 +390,22 @@ const getApiKeys = (): Set<string> => {
 };
 
 /**
- * Constant-time comparison of two strings using HMAC-based approach.
- * Prevents timing attacks by always comparing fixed-length hashes.
+ * Constant-time comparison of two strings.
+ * Prevents timing attacks by always comparing the same number of bytes.
  */
 const timingSafeCompare = (a: string, b: string): boolean => {
-  // Hash both strings to ensure equal length comparison
-  const hashA = createHash('sha256').update(a).digest();
-  const hashB = createHash('sha256').update(b).digest();
-  return timingSafeEqual(hashA, hashB);
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+
+  // If lengths differ, we still need constant-time behavior
+  // Compare against a buffer of the same length as bufA to avoid timing leaks
+  if (bufA.length !== bufB.length) {
+    // Always perform a comparison to maintain constant time
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+
+  return timingSafeEqual(bufA, bufB);
 };
 
 /**
