@@ -11,8 +11,8 @@
 const escapePromLabel = (value: string): string =>
   value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 
-/** Histogram bucket boundaries in milliseconds */
-const LATENCY_BUCKETS = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000];
+/** Histogram bucket boundaries in milliseconds (immutable) */
+const LATENCY_BUCKETS = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000] as const;
 
 /** Latency histogram data */
 interface LatencyHistogram {
@@ -145,10 +145,11 @@ export const getPrometheusMetrics = (): string => {
 
   for (const [endpoint, histogram] of Object.entries(metrics.latencyByEndpoint)) {
     const escapedEndpoint = escapePromLabel(endpoint);
-    // Output bucket counts (cumulative)
+    // Output bucket counts (cumulative) - defensively default missing counts to 0
     for (const bucket of LATENCY_BUCKETS) {
+      const bucketCount = histogram.buckets[bucket] ?? 0;
       lines.push(
-        `auggie_request_duration_ms_bucket{endpoint="${escapedEndpoint}",le="${String(bucket)}"} ${String(histogram.buckets[bucket])}`
+        `auggie_request_duration_ms_bucket{endpoint="${escapedEndpoint}",le="${String(bucket)}"} ${String(bucketCount)}`
       );
     }
     // +Inf bucket (same as count)

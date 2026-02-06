@@ -11,6 +11,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getAugmentService } from '#services/augment';
 import { getContextService } from '#services/context';
+import { logger } from '#services/logger';
 import { resolveModelAlias, AVAILABLE_MODELS } from '#config';
 import {
   MessageRole,
@@ -185,7 +186,7 @@ const enhanceMessagesWithContext = async (messages: ChatMessage[]): Promise<Chat
     return messages;
   }
 
-  console.log('[Chat] Enhanced message with codebase context');
+  logger.debug('Enhanced message with codebase context');
   const result = [...messages];
   result[lastUserIndex] = { ...lastUserMessage, content: enhancedContent };
   return result;
@@ -206,8 +207,7 @@ export const handleChatCompletion = async (
       const firstIssue = parseResult.error.issues[0];
       const errorMessage = firstIssue?.message ?? 'Invalid request';
       const errorPath = firstIssue?.path.join('.') ?? 'unknown';
-      console.error(`[Chat] Validation failed: ${errorMessage} at path: ${errorPath}`);
-      console.error(`[Chat] Full validation errors: ${JSON.stringify(parseResult.error.issues)}`);
+      logger.warn({ errorMessage, errorPath, issues: parseResult.error.issues }, 'Chat validation failed');
       res.status(400).json(
         createErrorResponse(
           errorMessage,
@@ -239,7 +239,7 @@ export const handleChatCompletion = async (
     // Resolve model alias (e.g., gpt-4o -> gpt-5, claude-3-opus -> claude-opus-4-5)
     const resolvedModel = resolveModelAlias(requestedModel);
     if (resolvedModel === undefined) {
-      console.error(`[Chat] Unknown model: ${requestedModel}`);
+      logger.warn({ requestedModel }, 'Unknown model requested');
       res.status(400).json(
         createErrorResponse(
           `Unknown model: '${requestedModel}'. Available models: ${AVAILABLE_MODELS.join(', ')}`,
@@ -253,13 +253,13 @@ export const handleChatCompletion = async (
     // Use resolved model (aliased or original)
     const model = resolvedModel;
     if (requestedModel !== model) {
-      console.log(`[Chat] Model alias: ${requestedModel} -> ${model}`);
+      logger.debug({ requestedModel, resolvedModel: model }, 'Model alias resolved');
     }
 
     // Log user identifier presence if provided (for analytics/abuse detection)
     // Note: We don't log the actual user value to avoid PII leakage
     if (user !== undefined) {
-      console.log('[Chat] User identifier provided');
+      logger.debug('User identifier provided');
     }
 
     // Log unsupported parameters that were provided
@@ -271,7 +271,7 @@ export const handleChatCompletion = async (
     if (logprobs !== undefined) unsupportedParams.push('logprobs');
 
     if (unsupportedParams.length > 0) {
-      console.log(`[Chat] Note: Parameters not yet supported by Augment SDK: ${unsupportedParams.join(', ')}`);
+      logger.debug({ unsupportedParams }, 'Parameters not yet supported by Augment SDK');
     }
 
     // Build generation options from request parameters
@@ -286,7 +286,7 @@ export const handleChatCompletion = async (
     };
 
     if (maxOutputTokens !== undefined) {
-      console.log(`[Chat] Max output tokens: ${String(maxOutputTokens)}`);
+      logger.debug({ maxOutputTokens }, 'Max output tokens configured');
     }
 
     const rawMessages = toChatMessages(messages);
@@ -296,7 +296,7 @@ export const handleChatCompletion = async (
 
     const service = getAugmentService();
 
-    console.log(`[Chat] Model: ${model}, Messages: ${String(messages.length)}, Stream: ${String(stream)}`);
+    logger.info({ model, messageCount: messages.length, stream }, 'Processing chat completion');
 
     if (stream) {
       // Set SSE headers
@@ -340,7 +340,7 @@ export const handleChatCompletion = async (
       res.json(buildCompletionResponse(result.text, model, result.usage));
     }
   } catch (error) {
-    console.error('[Chat] Error:', error);
+    logger.error({ err: error }, 'Chat completion error');
     next(error);
   }
 };

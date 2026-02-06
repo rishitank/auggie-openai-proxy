@@ -236,9 +236,7 @@ describe('handlers/chat', () => {
       expect(allData).toContain('prompt_tokens');
     });
 
-    it('should log when user identifier is provided', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    it('should accept request with user identifier', async () => {
       mockReq = {
         body: {
           messages: [{ role: 'user', content: 'Hello' }],
@@ -252,8 +250,9 @@ describe('handlers/chat', () => {
         mockNext
       );
 
-      expect(consoleSpy).toHaveBeenCalledWith('[Chat] User identifier provided');
-      consoleSpy.mockRestore();
+      // Should complete successfully with user identifier
+      expect(mockRes.status).not.toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledTimes(1);
     });
 
     it('should call next with error on exception', async () => {
@@ -610,16 +609,15 @@ describe('handlers/chat', () => {
     });
 
     describe('context enhancement', () => {
-      it('should enhance messages with codebase context when service is ready', async () => {
+      it('should call enhancePrompt when context service is ready', async () => {
         // Mock context service as ready with content enhancement
         const contextMock = await import('#services/context');
+        const enhancePromptMock = vi.fn((msg: string) => `Enhanced: ${msg}`);
         vi.mocked(contextMock.getContextService).mockReturnValueOnce({
           isReady: vi.fn(() => true),
-          enhancePrompt: vi.fn((msg: string) => `Enhanced: ${msg}`),
+          enhancePrompt: enhancePromptMock,
         } as unknown as ReturnType<typeof contextMock.getContextService>);
 
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
         mockReq = {
           body: {
             messages: [{ role: 'user', content: 'Hello' }],
@@ -632,19 +630,20 @@ describe('handlers/chat', () => {
           mockNext
         );
 
-        expect(consoleSpy).toHaveBeenCalledWith('[Chat] Enhanced message with codebase context');
-        consoleSpy.mockRestore();
+        // Verify enhancePrompt was called with the user message
+        expect(enhancePromptMock).toHaveBeenCalledWith('Hello');
+        // Should complete successfully
+        expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
-      it('should not enhance when context returns same content', async () => {
+      it('should call enhancePrompt even when it returns same content', async () => {
         const contextMock = await import('#services/context');
+        const enhancePromptMock = vi.fn((msg: string) => msg); // Returns same content
         vi.mocked(contextMock.getContextService).mockReturnValueOnce({
           isReady: vi.fn(() => true),
-          enhancePrompt: vi.fn((msg: string) => msg), // Returns same content
+          enhancePrompt: enhancePromptMock,
         } as unknown as ReturnType<typeof contextMock.getContextService>);
 
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
         mockReq = {
           body: {
             messages: [{ role: 'user', content: 'Hello' }],
@@ -657,19 +656,18 @@ describe('handlers/chat', () => {
           mockNext
         );
 
-        // Should NOT have called the enhancement log
-        const enhancementCalls = consoleSpy.mock.calls.filter(
-          (call) => call[0] === '[Chat] Enhanced message with codebase context'
-        );
-        expect(enhancementCalls).toHaveLength(0);
-        consoleSpy.mockRestore();
+        // Verify enhancePrompt was still called
+        expect(enhancePromptMock).toHaveBeenCalledWith('Hello');
+        // Should complete successfully
+        expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
 
-      it('should not enhance when no user messages exist', async () => {
+      it('should not call enhancePrompt when no user messages exist', async () => {
         const contextMock = await import('#services/context');
+        const enhancePromptMock = vi.fn((msg: string) => `Enhanced: ${msg}`);
         vi.mocked(contextMock.getContextService).mockReturnValueOnce({
           isReady: vi.fn(() => true),
-          enhancePrompt: vi.fn((msg: string) => `Enhanced: ${msg}`),
+          enhancePrompt: enhancePromptMock,
         } as unknown as ReturnType<typeof contextMock.getContextService>);
 
         mockReq = {
@@ -684,7 +682,9 @@ describe('handlers/chat', () => {
           mockNext
         );
 
-        // Should complete without error (no user message to enhance)
+        // enhancePrompt should NOT be called when there are no user messages
+        expect(enhancePromptMock).not.toHaveBeenCalled();
+        // Should complete without error
         expect(mockRes.json).toHaveBeenCalledTimes(1);
       });
     });

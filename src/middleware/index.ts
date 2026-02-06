@@ -13,7 +13,7 @@
  * - errorHandler: Error formatting
  */
 
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import type { OpenAIErrorResponse } from '#types';
 import { recordRequest, recordLatency } from '#services/metrics';
@@ -52,6 +52,32 @@ const VALUE_CORS_HEADERS = 'Content-Type, Authorization';
 const VALUE_CORS_MAX_AGE = '86400'; // 24 hours
 
 /**
+ * Normalize a path for metrics to prevent high-cardinality issues.
+ * Replaces dynamic segments (UUIDs, numbers) with placeholders.
+ */
+const normalizePath = (path: string): string => {
+  const normalized = path
+    // Replace UUIDs (8-4-4-4-12 format)
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ':id')
+    // Replace numeric IDs
+    .replace(/\/\d+/g, '/:id');
+
+  // If no transformation occurred and path is empty or just slashes, use fallback
+  return normalized && normalized !== '/' ? normalized : '/:unmatched';
+};
+
+/**
+ * Derive a normalized endpoint string from a request.
+ * Uses route path if available (matched routes), otherwise normalizes the raw path.
+ * Shared helper to avoid duplication between requestLogger and metricsRecorder.
+ */
+const deriveEndpoint = (req: Request): string => {
+  const routePath = (req.route as { path?: string } | undefined)?.path;
+  const normalizedPath = routePath ?? normalizePath(req.path);
+  return `${req.method} ${normalizedPath}`;
+};
+
+/**
  * Request logging middleware
  * Logs method, path, and response time using structured logging
  */
@@ -80,10 +106,8 @@ export const requestLogger = (
       },
       'Request completed'
     );
-    // Record latency for metrics
-    const routePath = (req.route as { path?: string } | undefined)?.path;
-    const normalizedPath = routePath ?? normalizePath(req.path);
-    const endpoint = `${req.method} ${normalizedPath}`;
+    // Record latency for metrics using shared helper
+    const endpoint = deriveEndpoint(req);
     recordLatency(endpoint, duration);
   });
 
@@ -94,31 +118,13 @@ export const requestLogger = (
  * Metrics recording middleware
  * Records request counts by endpoint and status code
  */
-/**
- * Normalize a path for metrics to prevent high-cardinality issues.
- * Replaces dynamic segments (UUIDs, numbers) with placeholders.
- */
-const normalizePath = (path: string): string => {
-  const normalized = path
-    // Replace UUIDs (8-4-4-4-12 format)
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ':id')
-    // Replace numeric IDs
-    .replace(/\/\d+/g, '/:id');
-
-  // If no transformation occurred and path is empty or just slashes, use fallback
-  return normalized && normalized !== '/' ? normalized : '/:unmatched';
-};
-
 export const metricsRecorder = (
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
   res.on('finish', () => {
-    // Use route path if available (matched routes), otherwise normalize the raw path
-    const routePath = (req.route as { path?: string } | undefined)?.path;
-    const normalizedPath = routePath ?? normalizePath(req.path);
-    const endpoint = `${req.method} ${normalizedPath}`;
+    const endpoint = deriveEndpoint(req);
     recordRequest(endpoint, res.statusCode);
   });
   next();
@@ -384,8 +390,35 @@ const getApiKeys = (): Set<string> => {
 };
 
 /**
+ * Constant-time comparison of two strings using HMAC-based approach.
+ * Prevents timing attacks by always comparing fixed-length hashes.
+ */
+const timingSafeCompare = (a: string, b: string): boolean => {
+  // Hash both strings to ensure equal length comparison
+  const hashA = createHash('sha256').update(a).digest();
+  const hashB = createHash('sha256').update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+};
+
+/**
+ * Check if a token matches any of the configured API keys using constant-time comparison.
+ * Iterates through all keys to prevent timing attacks.
+ */
+const isValidApiKey = (token: string, apiKeys: Set<string>): boolean => {
+  let isValid = false;
+  // Always iterate through all keys to prevent timing attacks
+  for (const key of apiKeys) {
+    if (timingSafeCompare(token, key)) {
+      isValid = true;
+      // Don't return early - continue checking all keys for constant time
+    }
+  }
+  return isValid;
+};
+
+/**
  * API key authentication middleware
- * Validates Bearer token against configured API keys
+ * Validates Bearer token against configured API keys using constant-time comparison
  * Skips auth if no API_KEYS are configured (open access)
  */
 export const apiKeyAuth = (
@@ -418,8 +451,8 @@ export const apiKeyAuth = (
 
   const token = authHeader.slice(7);
 
-  // Validate API key
-  if (!apiKeys.has(token)) {
+  // Validate API key using constant-time comparison
+  if (!isValidApiKey(token, apiKeys)) {
     const requestId = res.getHeader(HEADER_REQUEST_ID) as string | undefined;
     logger.warn({ requestId }, 'Invalid API key');
 
