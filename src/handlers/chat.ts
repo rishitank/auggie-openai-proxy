@@ -44,6 +44,21 @@ const getCurrentTimestamp = (): number => Math.floor(Date.now() / 1000);
 const generateSystemFingerprint = (): string => `fp_auggie_${Date.now().toString(36)}`;
 
 /**
+ * Default token details (Augment SDK doesn't provide these granular breakdowns)
+ */
+const DEFAULT_PROMPT_TOKENS_DETAILS = {
+  cached_tokens: 0,
+  audio_tokens: 0,
+} as const;
+
+const DEFAULT_COMPLETION_TOKENS_DETAILS = {
+  reasoning_tokens: 0,
+  audio_tokens: 0,
+  accepted_prediction_tokens: 0,
+  rejected_prediction_tokens: 0,
+} as const;
+
+/**
  * Build a complete chat completion response
  */
 const buildCompletionResponse = (
@@ -57,17 +72,8 @@ const buildCompletionResponse = (
           prompt_tokens: usage.promptTokens,
           completion_tokens: usage.completionTokens,
           total_tokens: usage.promptTokens + usage.completionTokens,
-          // Include details with default values (Augment SDK doesn't provide these)
-          prompt_tokens_details: {
-            cached_tokens: 0,
-            audio_tokens: 0,
-          },
-          completion_tokens_details: {
-            reasoning_tokens: 0,
-            audio_tokens: 0,
-            accepted_prediction_tokens: 0,
-            rejected_prediction_tokens: 0,
-          },
+          prompt_tokens_details: DEFAULT_PROMPT_TOKENS_DETAILS,
+          completion_tokens_details: DEFAULT_COMPLETION_TOKENS_DETAILS,
         }
       : undefined;
 
@@ -104,13 +110,17 @@ const createStreamContext = (): StreamContext => ({
 
 /**
  * Build a streaming SSE chunk with consistent ID across the stream
+ *
+ * Per OpenAI spec, when include_usage=true:
+ * - Intermediate chunks should have `usage: null`
+ * - Final chunk should have actual usage data
  */
 const buildStreamChunk = (
   ctx: StreamContext,
   content: string,
   model: string,
   isLast = false,
-  usage?: TokenUsage
+  usage?: TokenUsage | null
 ): StreamChunkResponse => ({
   id: ctx.id,
   object: 'chat.completion.chunk',
@@ -320,7 +330,8 @@ export const handleChatCompletion = async (
       let streamingUsage: TokenUsage | undefined;
       for await (const chunk of service.streamCompletionWithUsage(chatMessages, model, generationOptions)) {
         if (chunk.type === 'text') {
-          res.write(toSSE(buildStreamChunk(ctx, chunk.text, model)));
+          // Per OpenAI spec: intermediate chunks have usage: null when include_usage=true
+          res.write(toSSE(buildStreamChunk(ctx, chunk.text, model, false, includeUsage ? null : undefined)));
         } else if (includeUsage) {
           // chunk.type === 'finish' - Always include usage when requested, with fallback to zeros
           const { inputTokens, outputTokens, totalTokens } = chunk.usage;
@@ -328,8 +339,8 @@ export const handleChatCompletion = async (
             prompt_tokens: inputTokens ?? 0,
             completion_tokens: outputTokens ?? 0,
             total_tokens: totalTokens ?? ((inputTokens ?? 0) + (outputTokens ?? 0)),
-            prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0 },
-            completion_tokens_details: { reasoning_tokens: 0, audio_tokens: 0, accepted_prediction_tokens: 0, rejected_prediction_tokens: 0 },
+            prompt_tokens_details: DEFAULT_PROMPT_TOKENS_DETAILS,
+            completion_tokens_details: DEFAULT_COMPLETION_TOKENS_DETAILS,
           };
         }
       }

@@ -275,7 +275,13 @@ export interface StreamChunkResponse {
   readonly model: string;
   readonly system_fingerprint: string;
   readonly choices: readonly StreamChunkChoice[];
-  readonly usage?: TokenUsage;
+  /**
+   * Token usage statistics. Per OpenAI spec:
+   * - `undefined` when `include_usage` is false or not requested
+   * - `null` on intermediate chunks when `include_usage` is true
+   * - `TokenUsage` object on final chunk when `include_usage` is true
+   */
+  readonly usage?: TokenUsage | null;
 }
 
 /** Model info for /v1/models endpoint */
