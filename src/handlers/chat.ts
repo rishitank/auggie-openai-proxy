@@ -207,7 +207,13 @@ export const handleChatCompletion = async (
       const firstIssue = parseResult.error.issues[0];
       const errorMessage = firstIssue?.message ?? 'Invalid request';
       const errorPath = firstIssue?.path.join('.') ?? 'unknown';
-      logger.warn({ errorMessage, errorPath, issues: parseResult.error.issues }, 'Chat validation failed');
+      // Sanitize issues to avoid logging user-supplied values that may contain PII
+      const sanitizedIssues = parseResult.error.issues.map((issue) => ({
+        path: issue.path,
+        code: issue.code,
+        message: '<redacted>',
+      }));
+      logger.warn({ errorMessage, errorPath, issues: sanitizedIssues }, 'Chat validation failed');
       res.status(400).json(
         createErrorResponse(
           errorMessage,
@@ -321,7 +327,7 @@ export const handleChatCompletion = async (
           streamingUsage = {
             prompt_tokens: inputTokens ?? 0,
             completion_tokens: outputTokens ?? 0,
-            total_tokens: totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0),
+            total_tokens: totalTokens ?? ((inputTokens ?? 0) + (outputTokens ?? 0)),
             prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0 },
             completion_tokens_details: { reasoning_tokens: 0, audio_tokens: 0, accepted_prediction_tokens: 0, rejected_prediction_tokens: 0 },
           };

@@ -421,16 +421,30 @@ const timingSafeCompare = (a: string, b: string): boolean => {
 };
 
 /**
+ * Maximum number of API keys to iterate through for constant-time validation.
+ * This ensures timing doesn't leak the actual number of configured keys.
+ */
+const MAX_API_KEYS = 100;
+
+/** Dummy key used for padding when fewer than MAX_API_KEYS are configured */
+const DUMMY_API_KEY = 'dummy-key-for-constant-time-comparison';
+
+/**
  * Check if a token matches any of the configured API keys using constant-time comparison.
- * Iterates through all keys to prevent timing attacks.
+ * Always iterates through MAX_API_KEYS to prevent timing attacks from leaking key count.
  */
 const isValidApiKey = (token: string, apiKeys: Set<string>): boolean => {
+  const keys = Array.from(apiKeys);
   let isValid = false;
-  // Always iterate through all keys to prevent timing attacks
-  for (const key of apiKeys) {
-    if (timingSafeCompare(token, key)) {
-      isValid = true;
-      // Don't return early - continue checking all keys for constant time
+
+  // Always iterate through MAX_API_KEYS to prevent timing attacks
+  for (let i = 0; i < MAX_API_KEYS; i++) {
+    const candidateKey = keys[i] ?? DUMMY_API_KEY;
+    if (timingSafeCompare(token, candidateKey)) {
+      // Only count as valid if this was a real key (not dummy)
+      if (i < keys.length) {
+        isValid = true;
+      }
     }
   }
   return isValid;
@@ -465,6 +479,7 @@ export const apiKeyAuth = (
         code: 'invalid_api_key',
       },
     };
+    res.setHeader('WWW-Authenticate', 'Bearer realm="api"');
     res.status(401).json(response);
     return;
   }
@@ -483,6 +498,7 @@ export const apiKeyAuth = (
         code: 'invalid_api_key',
       },
     };
+    res.setHeader('WWW-Authenticate', 'Bearer realm="api"');
     res.status(401).json(response);
     return;
   }

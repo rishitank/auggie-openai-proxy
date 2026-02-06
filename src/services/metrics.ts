@@ -51,6 +51,20 @@ const metrics: Metrics = {
 };
 
 /**
+ * Reset all metrics to initial state.
+ * Used for test isolation to ensure clean slate between tests.
+ */
+export const resetMetrics = (): void => {
+  metrics.requestsTotal = 0;
+  metrics.requestsByEndpoint = {};
+  metrics.requestsByStatus = {};
+  metrics.errorsTotal = 0;
+  metrics.startTime = Date.now();
+  metrics.activeConnections = 0;
+  metrics.latencyByEndpoint = {};
+};
+
+/**
  * Increment request counter for an endpoint
  */
 export const recordRequest = (endpoint: string, statusCode: number): void => {
@@ -65,16 +79,20 @@ export const recordRequest = (endpoint: string, statusCode: number): void => {
 
 /**
  * Record request latency for an endpoint
+ * @param endpoint - The endpoint to record latency for
+ * @param durationMs - The duration in milliseconds (negative values are clamped to 0)
  */
 export const recordLatency = (endpoint: string, durationMs: number): void => {
+  // Guard against negative durations (can happen with clock skew or bugs)
+  const safeDuration = Math.max(0, durationMs);
   const histogram = (metrics.latencyByEndpoint[endpoint] ??= createHistogram());
 
-  histogram.sum += durationMs;
+  histogram.sum += safeDuration;
   histogram.count++;
 
   // Increment all buckets where duration <= bucket boundary
   for (const bucket of LATENCY_BUCKETS) {
-    if (durationMs <= bucket) {
+    if (safeDuration <= bucket) {
       const currentCount = histogram.buckets[bucket] ?? 0;
       histogram.buckets[bucket] = currentCount + 1;
     }
