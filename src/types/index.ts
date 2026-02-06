@@ -106,7 +106,7 @@ export const normalizeMessageContent = (msg: NormalizableMessage): OpenAIMessage
  * Stream options for including usage in streaming responses
  */
 export const StreamOptionsSchema = z.object({
-  include_usage: z.boolean().optional().default(false),
+  include_usage: z.boolean().default(false),
 });
 
 /**

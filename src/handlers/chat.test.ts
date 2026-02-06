@@ -41,10 +41,10 @@ vi.mock('#services/augment', () => ({
       yield 'Hello';
       yield '!';
     }),
-    streamCompletionWithUsage: vi.fn().mockImplementation(function* () {
-      yield { type: 'text', text: 'Hello' };
-      yield { type: 'text', text: '!' };
-      yield { type: 'finish', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } };
+    streamCompletionWithUsage: vi.fn().mockImplementation(async function* () {
+      yield await Promise.resolve({ type: 'text', text: 'Hello' });
+      yield await Promise.resolve({ type: 'text', text: '!' });
+      yield await Promise.resolve({ type: 'finish', usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } });
     }),
   })),
 }));

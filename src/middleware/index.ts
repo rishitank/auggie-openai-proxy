@@ -13,7 +13,7 @@
  * - errorHandler: Error formatting
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import type { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
 import type { OpenAIErrorResponse } from '#types';
 import { recordRequest, recordLatency } from '#services/metrics';
@@ -284,19 +284,26 @@ const cleanupRateLimitStore = (): void => {
   }
 };
 
-// Run cleanup every minute
-setInterval(cleanupRateLimitStore, 60_000);
+// Run cleanup every minute (unref to allow graceful shutdown)
+const rateLimitCleanupInterval = setInterval(cleanupRateLimitStore, 60_000);
+rateLimitCleanupInterval.unref();
+
+/**
+ * Hash a string using SHA-256 and return first 16 hex characters
+ */
+const hashKey = (key: string): string =>
+  createHash('sha256').update(key).digest('hex').slice(0, 16);
 
 /**
  * Extract client identifier for rate limiting
- * Uses API key if present, otherwise falls back to IP
+ * Uses API key hash if present, otherwise falls back to IP
  */
 const getClientId = (req: Request): string => {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ') === true) {
-    // Use a hash of the API key to avoid storing keys
+    // Use a hash of the API key to avoid storing/logging keys
     const key = authHeader.slice(7);
-    return `key:${key.slice(0, 8)}...${key.slice(-4)}`;
+    return `key:sha256:${hashKey(key)}`;
   }
   // Fall back to IP address
   const forwarded = req.headers['x-forwarded-for'];
@@ -306,7 +313,8 @@ const getClientId = (req: Request): string => {
 
 /**
  * Rate limiting middleware
- * Implements sliding window rate limiting per client
+ * Implements fixed-window rate limiting per client
+ * Counters reset when the window expires
  */
 export const rateLimiter = (config: RateLimitConfig = DEFAULT_RATE_LIMIT) => {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -354,11 +362,25 @@ export const rateLimiter = (config: RateLimitConfig = DEFAULT_RATE_LIMIT) => {
 // API Key Authentication
 // =============================================================================
 
-/** API keys configuration (loaded from environment) */
+/** Cached API keys to avoid reparsing on every request */
+let cachedApiKeys: Set<string> | undefined;
+let cachedApiKeysRaw: string | undefined;
+
+/** API keys configuration (loaded from environment, cached) */
 const getApiKeys = (): Set<string> => {
   const keys = process.env.API_KEYS;
-  if (keys === undefined || keys === '') return new Set();
-  return new Set(keys.split(',').map((k) => k.trim()).filter(Boolean));
+  // Return cached Set if env hasn't changed
+  if (keys === cachedApiKeysRaw && cachedApiKeys !== undefined) {
+    return cachedApiKeys;
+  }
+  // Update cache
+  cachedApiKeysRaw = keys;
+  if (keys === undefined || keys === '') {
+    cachedApiKeys = new Set();
+  } else {
+    cachedApiKeys = new Set(keys.split(',').map((k) => k.trim()).filter(Boolean));
+  }
+  return cachedApiKeys;
 };
 
 /**

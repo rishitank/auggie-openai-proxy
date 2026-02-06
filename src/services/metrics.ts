@@ -67,8 +67,7 @@ export const recordRequest = (endpoint: string, statusCode: number): void => {
  * Record request latency for an endpoint
  */
 export const recordLatency = (endpoint: string, durationMs: number): void => {
-  metrics.latencyByEndpoint[endpoint] ??= createHistogram();
-  const histogram = metrics.latencyByEndpoint[endpoint];
+  const histogram = (metrics.latencyByEndpoint[endpoint] ??= createHistogram());
 
   histogram.sum += durationMs;
   histogram.count++;
