@@ -222,6 +222,7 @@ export const handleChatCompletion = async (
       model: requestedModel,
       messages,
       stream,
+      stream_options,
       user,
       // Token limits (supported)
       max_tokens,
@@ -306,14 +307,31 @@ export const handleChatCompletion = async (
       // Create stream context for consistent ID across all chunks
       const ctx = createStreamContext();
 
-      // Stream chunks
-      for await (const chunk of service.streamCompletion(chatMessages, model, generationOptions)) {
-        res.write(toSSE(buildStreamChunk(ctx, chunk, model)));
+      // Check if usage should be included in streaming response
+      const includeUsage = stream_options?.include_usage === true;
+
+      // Stream chunks with usage tracking
+      let streamingUsage: TokenUsage | undefined;
+      for await (const chunk of service.streamCompletionWithUsage(chatMessages, model, generationOptions)) {
+        if (chunk.type === 'text') {
+          res.write(toSSE(buildStreamChunk(ctx, chunk.text, model)));
+        } else if (includeUsage) {
+          // chunk.type === 'finish' - Capture usage from finish chunk
+          const { inputTokens, outputTokens, totalTokens } = chunk.usage;
+          if (inputTokens !== undefined || outputTokens !== undefined) {
+            streamingUsage = {
+              prompt_tokens: inputTokens ?? 0,
+              completion_tokens: outputTokens ?? 0,
+              total_tokens: totalTokens ?? (inputTokens ?? 0) + (outputTokens ?? 0),
+              prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0 },
+              completion_tokens_details: { reasoning_tokens: 0, audio_tokens: 0, accepted_prediction_tokens: 0, rejected_prediction_tokens: 0 },
+            };
+          }
+        }
       }
 
-      // Send final chunk and done signal
-      // Note: Token usage in streaming requires Augment SDK support (not yet available)
-      res.write(toSSE(buildStreamChunk(ctx, '', model, true)));
+      // Send final chunk with optional usage
+      res.write(toSSE(buildStreamChunk(ctx, '', model, true, streamingUsage)));
       res.write('data: [DONE]\n\n');
       res.end();
     } else {

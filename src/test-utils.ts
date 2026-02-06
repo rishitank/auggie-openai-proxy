@@ -16,10 +16,12 @@ export interface MockResponse {
   json: Mock;
   status: Mock;
   setHeader: Mock;
+  getHeader: Mock;
   write: Mock;
   end: Mock;
   send: Mock;
   sendStatus: Mock;
+  on: Mock;
   /** Cast to Express Response for passing to handlers */
   asResponse: () => Response;
 }
@@ -33,14 +35,21 @@ export interface MockResponse {
  * expect(mockRes.json).toHaveBeenCalledWith({ data: 'test' });
  */
 export function createMockResponse(): MockResponse {
+  const headers: Record<string, string | number | readonly string[] | undefined> = {};
+
   const res: MockResponse = {
     json: vi.fn(),
     status: vi.fn(),
-    setHeader: vi.fn(),
+    setHeader: vi.fn((name: string, value: string | number | readonly string[]) => {
+      headers[name.toLowerCase()] = value;
+      return res;
+    }),
+    getHeader: vi.fn((name: string) => headers[name.toLowerCase()]),
     write: vi.fn(),
     end: vi.fn(),
     send: vi.fn(),
     sendStatus: vi.fn(),
+    on: vi.fn(),
     asResponse() {
       return this as unknown as Response;
     },
@@ -48,7 +57,6 @@ export function createMockResponse(): MockResponse {
 
   // Make methods chainable (return res for method chaining)
   res.status.mockReturnThis();
-  res.setHeader.mockReturnThis();
   res.send.mockReturnThis();
 
   return res;

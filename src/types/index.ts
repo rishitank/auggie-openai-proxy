@@ -103,6 +103,13 @@ export const normalizeMessageContent = (msg: NormalizableMessage): OpenAIMessage
 };
 
 /**
+ * Stream options for including usage in streaming responses
+ */
+export const StreamOptionsSchema = z.object({
+  include_usage: z.boolean().optional().default(false),
+});
+
+/**
  * Chat completion request body
  * Uses passthrough() to allow additional OpenAI fields like tools, response_format, etc.
  * that we don't explicitly handle but shouldn't reject
@@ -114,6 +121,8 @@ export const ChatCompletionRequestSchema = z
       .array(OpenAIMessageSchema)
       .min(1, 'messages must be a non-empty array'),
     stream: z.boolean().optional().default(false),
+    // Stream options for including usage in streaming responses
+    stream_options: StreamOptionsSchema.optional(),
     // Sampling parameters
     temperature: z.number().min(0).max(2).optional(),
     top_p: z.number().min(0).max(1).optional(),

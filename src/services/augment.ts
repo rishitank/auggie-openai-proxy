@@ -34,6 +34,18 @@ export interface GenerationOptions {
   readonly stopSequences?: string[];
 }
 
+/** Token usage from streaming response */
+export interface StreamingUsage {
+  readonly inputTokens?: number;
+  readonly outputTokens?: number;
+  readonly totalTokens?: number;
+}
+
+/** Streaming chunk types */
+export type StreamChunk =
+  | { type: 'text'; text: string }
+  | { type: 'finish'; usage: StreamingUsage };
+
 /** LanguageModelV2 message types */
 interface SystemMessage {
   role: MessageRole.System;
@@ -192,6 +204,25 @@ export class AugmentService {
     modelName: string,
     options?: GenerationOptions
   ): AsyncGenerator<string, void, undefined> {
+    for await (const chunk of this.streamCompletionWithUsage(messages, modelName, options)) {
+      if (chunk.type === 'text') {
+        yield chunk.text;
+      }
+      // Ignore 'finish' chunks in legacy method (for backward compatibility)
+    }
+  }
+
+  /**
+   * Stream a chat completion with usage information
+   *
+   * Yields text chunks and a final finish chunk with token usage.
+   * Uses doStream directly to avoid AI SDK version conflicts.
+   */
+  async *streamCompletionWithUsage(
+    messages: readonly ChatMessage[],
+    modelName: string,
+    options?: GenerationOptions
+  ): AsyncGenerator<StreamChunk, void, undefined> {
     const model = this.createModel(modelName);
     const prompt = messages.map(toLanguageModelMessage);
 
@@ -203,9 +234,20 @@ export class AugmentService {
     try {
       let result = await reader.read();
       while (!result.done) {
-        // Only yield text deltas
-        if (result.value.type === 'text-delta') {
-          yield result.value.delta;
+        const value = result.value;
+        if (value.type === 'text-delta') {
+          yield { type: 'text', text: value.delta };
+        } else if (value.type === 'finish') {
+          // Yield finish chunk with usage information
+          const usageData = value.usage;
+          yield {
+            type: 'finish',
+            usage: {
+              inputTokens: usageData.inputTokens,
+              outputTokens: usageData.outputTokens,
+              totalTokens: usageData.totalTokens,
+            },
+          };
         }
         result = await reader.read();
       }

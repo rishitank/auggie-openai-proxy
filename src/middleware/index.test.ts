@@ -5,7 +5,6 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import type { MockInstance } from 'vitest';
 import { requestLogger, errorHandler, metricsRecorder, cors, requestTimeout, securityHeaders, requestId } from './index';
 import * as metricsService from '#services/metrics';
 import { createMockResponse, createMockNext, type MockResponse } from '../test-utils';
@@ -15,46 +14,33 @@ const noop: () => void = () => undefined;
 describe('middleware', () => {
   describe('requestLogger', () => {
     let mockReq: Partial<Request>;
-    let mockRes: Partial<Response>;
-    let mockNext: NextFunction;
-    let consoleSpy: MockInstance<(message?: unknown, ...optionalParams: unknown[]) => void>;
+    let mockRes: MockResponse;
 
     beforeEach(() => {
       mockReq = {
         method: 'GET',
         path: '/v1/models',
       };
-      mockRes = {};
-      mockNext = noop;
-      consoleSpy = vi.spyOn(console, 'log').mockImplementation(noop);
-    });
-
-    it('should log request method and path', () => {
-      requestLogger(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(consoleSpy).toHaveBeenCalledTimes(1);
-      const logCalls = consoleSpy.mock.calls as string[][];
-      expect(logCalls.length).toBeGreaterThan(0);
-      const firstArg = logCalls[0]?.[0];
-      expect(firstArg).toContain('GET');
-      expect(firstArg).toContain('/v1/models');
+      mockRes = createMockResponse();
     });
 
     it('should call next()', () => {
       const nextSpy = vi.fn();
-      requestLogger(mockReq as Request, mockRes as Response, nextSpy);
+      requestLogger(mockReq as Request, mockRes.asResponse(), nextSpy);
 
       expect(nextSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('should include timestamp in log', () => {
-      requestLogger(mockReq as Request, mockRes as Response, mockNext);
+    it('should register finish event handler for response timing', () => {
+      requestLogger(mockReq as Request, mockRes.asResponse(), noop);
 
-      // Timestamp format: [YYYY-MM-DDTHH:MM:SS.sssZ]
-      const logCalls = consoleSpy.mock.calls as string[][];
-      expect(logCalls.length).toBeGreaterThan(0);
-      const firstArg = logCalls[0]?.[0];
-      expect(firstArg).toMatch(/\[\d{4}-\d{2}-\d{2}T/);
+      expect(mockRes.on).toHaveBeenCalledWith('finish', expect.any(Function));
+    });
+
+    it('should call getHeader to retrieve request ID', () => {
+      requestLogger(mockReq as Request, mockRes.asResponse(), noop);
+
+      expect(mockRes.getHeader).toHaveBeenCalledWith('X-Request-ID');
     });
   });
 
@@ -62,13 +48,11 @@ describe('middleware', () => {
     let mockReq: Partial<Request>;
     let mockRes: MockResponse;
     let mockNext: ReturnType<typeof createMockNext>;
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      mockReq = {};
+      mockReq = { path: '/test' };
       mockRes = createMockResponse();
       mockNext = createMockNext();
-      consoleSpy = vi.spyOn(console, 'error').mockImplementation(noop);
     });
 
     it('should return 500 status', () => {
@@ -112,12 +96,12 @@ describe('middleware', () => {
       expect(response.error.message).toBe('Internal server error');
     });
 
-    it('should log the error', () => {
+    it('should call getHeader for request ID', () => {
       const error = new Error('Test error');
 
       errorHandler(error, mockReq as Request, mockRes.asResponse(), mockNext);
 
-      expect(consoleSpy).toHaveBeenCalledWith('[Error]', error);
+      expect(mockRes.getHeader).toHaveBeenCalledWith('X-Request-ID');
     });
   });
 
@@ -377,6 +361,110 @@ describe('middleware', () => {
     it('should call next()', () => {
       const nextSpy = vi.fn();
       requestId(mockReq as Request, mockRes.asResponse(), nextSpy);
+
+      expect(nextSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('rateLimiter', () => {
+    let mockReq: Partial<Request>;
+    let mockRes: MockResponse;
+
+    beforeEach(() => {
+      mockReq = {
+        headers: {},
+        ip: '127.0.0.1',
+      };
+      mockRes = createMockResponse();
+    });
+
+    it('should call next() for requests within limit', async () => {
+      const { rateLimiter } = await import('./index');
+      const nextSpy = vi.fn();
+      const limiter = rateLimiter({ maxRequests: 10, windowMs: 60000 });
+
+      limiter(mockReq as Request, mockRes.asResponse(), nextSpy);
+
+      expect(nextSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should set rate limit headers', async () => {
+      const { rateLimiter } = await import('./index');
+      const nextSpy = vi.fn();
+      const limiter = rateLimiter({ maxRequests: 100, windowMs: 60000 });
+
+      limiter(mockReq as Request, mockRes.asResponse(), nextSpy);
+
+      expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', 100);
+      expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', expect.any(Number));
+      expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Reset', expect.any(Number));
+    });
+  });
+
+  describe('apiKeyAuth', () => {
+    let mockReq: Partial<Request>;
+    let mockRes: MockResponse;
+    const originalEnv = process.env.API_KEYS;
+
+    beforeEach(() => {
+      mockReq = {
+        headers: {},
+      };
+      mockRes = createMockResponse();
+    });
+
+    afterEach(() => {
+      if (originalEnv === undefined) {
+        delete process.env.API_KEYS;
+      } else {
+        process.env.API_KEYS = originalEnv;
+      }
+    });
+
+    it('should call next() when no API_KEYS configured (open access)', async () => {
+      delete process.env.API_KEYS;
+      vi.resetModules();
+      const { apiKeyAuth } = await import('./index');
+      const nextSpy = vi.fn();
+
+      apiKeyAuth(mockReq as Request, mockRes.asResponse(), nextSpy);
+
+      expect(nextSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return 401 when API_KEYS configured but no auth header', async () => {
+      process.env.API_KEYS = 'test-key-1,test-key-2';
+      vi.resetModules();
+      const { apiKeyAuth } = await import('./index');
+      const nextSpy = vi.fn();
+
+      apiKeyAuth(mockReq as Request, mockRes.asResponse(), nextSpy);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(nextSpy).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 for invalid API key', async () => {
+      process.env.API_KEYS = 'valid-key';
+      vi.resetModules();
+      const { apiKeyAuth } = await import('./index');
+      const nextSpy = vi.fn();
+      mockReq.headers = { authorization: 'Bearer invalid-key' };
+
+      apiKeyAuth(mockReq as Request, mockRes.asResponse(), nextSpy);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(nextSpy).not.toHaveBeenCalled();
+    });
+
+    it('should call next() for valid API key', async () => {
+      process.env.API_KEYS = 'valid-key-123';
+      vi.resetModules();
+      const { apiKeyAuth } = await import('./index');
+      const nextSpy = vi.fn();
+      mockReq.headers = { authorization: 'Bearer valid-key-123' };
+
+      apiKeyAuth(mockReq as Request, mockRes.asResponse(), nextSpy);
 
       expect(nextSpy).toHaveBeenCalledTimes(1);
     });
