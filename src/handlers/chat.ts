@@ -345,8 +345,22 @@ export const handleChatCompletion = async (
         }
       }
 
-      // Send final chunk with optional usage
-      res.write(toSSE(buildStreamChunk(ctx, '', model, true, streamingUsage)));
+      // Per OpenAI spec: finish chunk has usage: null when include_usage=true
+      res.write(toSSE(buildStreamChunk(ctx, '', model, true, includeUsage ? null : undefined)));
+
+      // Per OpenAI spec: additional usage-only chunk with choices: [] when include_usage=true
+      if (streamingUsage !== undefined) {
+        const usageChunk: StreamChunkResponse = {
+          id: ctx.id,
+          object: 'chat.completion.chunk',
+          created: ctx.created,
+          model,
+          system_fingerprint: ctx.systemFingerprint,
+          choices: [],
+          usage: streamingUsage,
+        };
+        res.write(toSSE(usageChunk));
+      }
       res.write('data: [DONE]\n\n');
       res.end();
     } else {
@@ -356,7 +370,17 @@ export const handleChatCompletion = async (
     }
   } catch (error) {
     logger.error({ err: error }, 'Chat completion error');
-    next(error);
+    // If headers already sent (streaming in progress), gracefully end the stream
+    if (res.headersSent) {
+      try {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } catch {
+        res.end();
+      }
+    } else {
+      next(error);
+    }
   }
 };
 

@@ -232,24 +232,32 @@ describe('handlers/chat', () => {
       expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
       expect(writeMock).toHaveBeenCalled();
 
-      // Parse SSE chunks and verify usage structure in final chunk
+      // Parse SSE chunks and verify OpenAI spec compliance
       const calls = writeMock.mock.calls;
       const sseChunks = calls
         .map((c: unknown[]) => String(c[0]))
         .filter((s: string) => s.startsWith('data: ') && !s.includes('[DONE]'))
         .map((s: string) => JSON.parse(s.replace('data: ', '').trim()) as Record<string, unknown>);
 
-      // Intermediate chunks should have usage: null per OpenAI spec
-      const intermediateChunks = sseChunks.slice(0, -1);
-      for (const chunk of intermediateChunks) {
+      // Per OpenAI spec: all chunks except the usage-only chunk should have usage: null
+      // The usage-only chunk should have choices: [] and actual usage data
+      const usageChunk = sseChunks.find(
+        (chunk) => Array.isArray(chunk.choices) && (chunk.choices as unknown[]).length === 0
+      );
+      const contentChunks = sseChunks.filter(
+        (chunk) => Array.isArray(chunk.choices) && (chunk.choices as unknown[]).length > 0
+      );
+
+      // Content chunks (including finish chunk) should have usage: null
+      for (const chunk of contentChunks) {
         expect(chunk.usage).toBeNull();
       }
 
-      // Final chunk should have actual usage data
-      const finalChunk = sseChunks[sseChunks.length - 1];
-      expect(finalChunk).toBeDefined();
-      expect(finalChunk?.usage).toBeDefined();
-      const usage = finalChunk?.usage as Record<string, unknown>;
+      // Usage-only chunk should have choices: [] and actual usage data
+      expect(usageChunk).toBeDefined();
+      expect((usageChunk?.choices as unknown[]).length).toBe(0);
+      expect(usageChunk?.usage).toBeDefined();
+      const usage = usageChunk?.usage as Record<string, unknown>;
       expect(usage.prompt_tokens).toBe(10);
       expect(usage.completion_tokens).toBe(5);
       expect(usage.total_tokens).toBe(15);

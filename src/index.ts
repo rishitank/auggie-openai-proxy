@@ -18,7 +18,7 @@
 
 import compression from 'compression';
 import express, { type Request, type Response } from 'express';
-import { loadConfig, validateEnvironment } from '#config';
+import { loadConfig, validateEnvironment, AVAILABLE_MODELS } from '#config';
 import { VERSION, NAME } from '#version';
 import { initializeAugment, getAugmentService } from '#services/augment';
 import { initializeContextService, getContextService } from '#services/context';
@@ -53,8 +53,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(requestLogger);
 app.use(metricsRecorder);
 app.use(requestTimeout());
-app.use(rateLimiter()); // Rate limiting (configurable via RATE_LIMIT_* env vars)
 app.use(apiKeyAuth); // API key auth (enabled when API_KEYS env var is set)
+app.use(rateLimiter()); // Rate limiting (configurable via RATE_LIMIT_* env vars)
 
 // =============================================================================
 // Routes
@@ -165,7 +165,7 @@ async function main(): Promise<void> {
       console.log(`\n💡 Client config:`);
       console.log(`   baseUrl: "http://${config.host}:${String(config.port)}/v1"`);
       console.log(`   api: "openai-completions"`);
-      console.log(`   models: claude-sonnet-4-5, claude-opus-4-5, claude-haiku-4-5, gpt-5\n`);
+      console.log(`   models: ${AVAILABLE_MODELS.join(', ')}\n`);
     });
 
     // Graceful shutdown handler
@@ -178,7 +178,7 @@ async function main(): Promise<void> {
 
       // Force exit after 10 seconds if connections don't close
       setTimeout(() => {
-        logger.error('Forced shutdown after timeout');
+        logger.fatal('Forced shutdown after timeout');
         process.exit(1);
       }, 10000).unref();
     };
