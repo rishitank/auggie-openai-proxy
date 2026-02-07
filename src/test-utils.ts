@@ -22,6 +22,8 @@ export interface MockResponse {
   send: Mock;
   sendStatus: Mock;
   on: Mock;
+  /** Indicates if headers have been sent (for streaming error handling) */
+  headersSent: boolean;
   /** Cast to Express Response for passing to handlers */
   asResponse: () => Response;
 }
@@ -50,6 +52,7 @@ export function createMockResponse(): MockResponse {
     send: vi.fn(),
     sendStatus: vi.fn(),
     on: vi.fn(),
+    headersSent: false,
     asResponse() {
       return this as unknown as Response;
     },

@@ -254,13 +254,58 @@ describe('handlers/chat', () => {
       }
 
       // Usage-only chunk should have choices: [] and actual usage data
-      expect(usageChunk).toBeDefined();
-      expect((usageChunk?.choices as unknown[]).length).toBe(0);
-      expect(usageChunk?.usage).toBeDefined();
-      const usage = usageChunk?.usage as Record<string, unknown>;
+      assertDefined(usageChunk, 'Expected a usage-only chunk with empty choices');
+      expect((usageChunk.choices as unknown[]).length).toBe(0);
+      expect(usageChunk.usage).toBeDefined();
+      const usage = usageChunk.usage as Record<string, unknown>;
       expect(usage.prompt_tokens).toBe(10);
       expect(usage.completion_tokens).toBe(5);
       expect(usage.total_tokens).toBe(15);
+    });
+
+    it('should gracefully end stream on mid-stream error', async () => {
+      // Mock streamCompletionWithUsage to throw mid-stream
+      const streamError = new Error('Mid-stream error');
+      vi.mocked(getAugmentService).mockReturnValueOnce({
+        isInitialized: true,
+        generateCompletion: vi.fn(),
+        streamCompletion: vi.fn(),
+        streamCompletionWithUsage: vi.fn().mockImplementation(async function* () {
+          await Promise.resolve(); // Satisfy require-await for async generator
+          yield { type: 'text' as const, text: 'Hello' };
+          throw streamError;
+        }),
+      } as unknown as ReturnType<typeof getAugmentService>);
+
+      const writeMock = vi.fn();
+      const endMock = vi.fn();
+      mockReq = {
+        body: {
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: true,
+        },
+      };
+      // Simulate headers already sent (streaming in progress)
+      mockRes = {
+        ...mockRes,
+        write: writeMock,
+        end: endMock,
+        headersSent: true,
+      };
+
+      await handleChatCompletion(
+        mockReq as Request,
+        mockRes.asResponse(),
+        mockNext
+      );
+
+      // Stream should be terminated gracefully with [DONE]
+      const calls = writeMock.mock.calls;
+      const allData = calls.map((c: unknown[]) => String(c[0])).join('');
+      expect(allData).toContain('[DONE]');
+      expect(endMock).toHaveBeenCalled();
+      // next should NOT be called when headers are already sent
+      expect(mockNext).not.toHaveBeenCalled();
     });
 
     it('should accept request with user identifier', async () => {
