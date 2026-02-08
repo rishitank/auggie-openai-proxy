@@ -14,17 +14,18 @@ vi.mock('@augmentcode/auggie-sdk', () => ({
       content: [{ type: 'text', text: 'Generated response' }],
       usage: { inputTokens: 10, outputTokens: 20 },
     });
-    doStream = vi.fn().mockResolvedValue({
+    doStream = vi.fn().mockImplementation(() => Promise.resolve({
       stream: {
         getReader: () => ({
           read: vi.fn()
             .mockResolvedValueOnce({ done: false, value: { type: 'text-delta', delta: 'Hello' } })
             .mockResolvedValueOnce({ done: false, value: { type: 'text-delta', delta: ' world' } })
+            .mockResolvedValueOnce({ done: false, value: { type: 'finish', usage: { inputTokens: 15, outputTokens: 25, totalTokens: 40 } } })
             .mockResolvedValueOnce({ done: true }),
           releaseLock: vi.fn(),
         }),
       },
-    });
+    }));
   },
   resolveAugmentCredentials: vi.fn().mockResolvedValue({
     apiKey: 'test-api-key',
@@ -183,6 +184,29 @@ describe('services/augment', () => {
         }
 
         expect(chunks).toEqual(['Hello', ' world']);
+      });
+    });
+
+    describe('streamCompletionWithUsage', () => {
+      beforeEach(async () => {
+        await service.initialize('token', 'https://api.com');
+      });
+
+      it('should stream completion chunks with usage information', async () => {
+        const messages = [{ role: MessageRole.User, content: 'Hello' }];
+        const chunks: { type: string; text?: string; usage?: unknown }[] = [];
+
+        for await (const chunk of service.streamCompletionWithUsage(messages, 'claude-sonnet-4-5')) {
+          chunks.push(chunk);
+        }
+
+        expect(chunks).toHaveLength(3);
+        expect(chunks[0]).toEqual({ type: 'text', text: 'Hello' });
+        expect(chunks[1]).toEqual({ type: 'text', text: ' world' });
+        expect(chunks[2]).toEqual({
+          type: 'finish',
+          usage: { inputTokens: 15, outputTokens: 25, totalTokens: 40 },
+        });
       });
     });
 

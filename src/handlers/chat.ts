@@ -11,6 +11,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
 import { getAugmentService } from '#services/augment';
 import { getContextService } from '#services/context';
+import { logger } from '#services/logger';
 import { resolveModelAlias, AVAILABLE_MODELS } from '#config';
 import {
   MessageRole,
@@ -43,6 +44,21 @@ const getCurrentTimestamp = (): number => Math.floor(Date.now() / 1000);
 const generateSystemFingerprint = (): string => `fp_auggie_${Date.now().toString(36)}`;
 
 /**
+ * Default token details (Augment SDK doesn't provide these granular breakdowns)
+ */
+const DEFAULT_PROMPT_TOKENS_DETAILS = {
+  cached_tokens: 0,
+  audio_tokens: 0,
+} as const;
+
+const DEFAULT_COMPLETION_TOKENS_DETAILS = {
+  reasoning_tokens: 0,
+  audio_tokens: 0,
+  accepted_prediction_tokens: 0,
+  rejected_prediction_tokens: 0,
+} as const;
+
+/**
  * Build a complete chat completion response
  */
 const buildCompletionResponse = (
@@ -56,17 +72,8 @@ const buildCompletionResponse = (
           prompt_tokens: usage.promptTokens,
           completion_tokens: usage.completionTokens,
           total_tokens: usage.promptTokens + usage.completionTokens,
-          // Include details with default values (Augment SDK doesn't provide these)
-          prompt_tokens_details: {
-            cached_tokens: 0,
-            audio_tokens: 0,
-          },
-          completion_tokens_details: {
-            reasoning_tokens: 0,
-            audio_tokens: 0,
-            accepted_prediction_tokens: 0,
-            rejected_prediction_tokens: 0,
-          },
+          prompt_tokens_details: DEFAULT_PROMPT_TOKENS_DETAILS,
+          completion_tokens_details: DEFAULT_COMPLETION_TOKENS_DETAILS,
         }
       : undefined;
 
@@ -103,13 +110,17 @@ const createStreamContext = (): StreamContext => ({
 
 /**
  * Build a streaming SSE chunk with consistent ID across the stream
+ *
+ * Per OpenAI spec, when include_usage=true:
+ * - Intermediate chunks should have `usage: null`
+ * - Final chunk should have actual usage data
  */
 const buildStreamChunk = (
   ctx: StreamContext,
   content: string,
   model: string,
   isLast = false,
-  usage?: TokenUsage
+  usage?: TokenUsage | null
 ): StreamChunkResponse => ({
   id: ctx.id,
   object: 'chat.completion.chunk',
@@ -185,7 +196,7 @@ const enhanceMessagesWithContext = async (messages: ChatMessage[]): Promise<Chat
     return messages;
   }
 
-  console.log('[Chat] Enhanced message with codebase context');
+  logger.debug('Enhanced message with codebase context');
   const result = [...messages];
   result[lastUserIndex] = { ...lastUserMessage, content: enhancedContent };
   return result;
@@ -206,8 +217,13 @@ export const handleChatCompletion = async (
       const firstIssue = parseResult.error.issues[0];
       const errorMessage = firstIssue?.message ?? 'Invalid request';
       const errorPath = firstIssue?.path.join('.') ?? 'unknown';
-      console.error(`[Chat] Validation failed: ${errorMessage} at path: ${errorPath}`);
-      console.error(`[Chat] Full validation errors: ${JSON.stringify(parseResult.error.issues)}`);
+      // Sanitize issues to avoid logging user-supplied values that may contain PII
+      const sanitizedIssues = parseResult.error.issues.map((issue) => ({
+        path: issue.path,
+        code: issue.code,
+        message: '<redacted>',
+      }));
+      logger.warn({ errorMessage, errorPath, issues: sanitizedIssues }, 'Chat validation failed');
       res.status(400).json(
         createErrorResponse(
           errorMessage,
@@ -222,6 +238,7 @@ export const handleChatCompletion = async (
       model: requestedModel,
       messages,
       stream,
+      stream_options,
       user,
       // Token limits (supported)
       max_tokens,
@@ -238,7 +255,7 @@ export const handleChatCompletion = async (
     // Resolve model alias (e.g., gpt-4o -> gpt-5, claude-3-opus -> claude-opus-4-5)
     const resolvedModel = resolveModelAlias(requestedModel);
     if (resolvedModel === undefined) {
-      console.error(`[Chat] Unknown model: ${requestedModel}`);
+      logger.warn({ requestedModel }, 'Unknown model requested');
       res.status(400).json(
         createErrorResponse(
           `Unknown model: '${requestedModel}'. Available models: ${AVAILABLE_MODELS.join(', ')}`,
@@ -252,13 +269,13 @@ export const handleChatCompletion = async (
     // Use resolved model (aliased or original)
     const model = resolvedModel;
     if (requestedModel !== model) {
-      console.log(`[Chat] Model alias: ${requestedModel} -> ${model}`);
+      logger.debug({ requestedModel, resolvedModel: model }, 'Model alias resolved');
     }
 
     // Log user identifier presence if provided (for analytics/abuse detection)
     // Note: We don't log the actual user value to avoid PII leakage
     if (user !== undefined) {
-      console.log('[Chat] User identifier provided');
+      logger.debug('User identifier provided');
     }
 
     // Log unsupported parameters that were provided
@@ -270,7 +287,7 @@ export const handleChatCompletion = async (
     if (logprobs !== undefined) unsupportedParams.push('logprobs');
 
     if (unsupportedParams.length > 0) {
-      console.log(`[Chat] Note: Parameters not yet supported by Augment SDK: ${unsupportedParams.join(', ')}`);
+      logger.debug({ unsupportedParams }, 'Parameters not yet supported by Augment SDK');
     }
 
     // Build generation options from request parameters
@@ -285,7 +302,7 @@ export const handleChatCompletion = async (
     };
 
     if (maxOutputTokens !== undefined) {
-      console.log(`[Chat] Max output tokens: ${String(maxOutputTokens)}`);
+      logger.debug({ maxOutputTokens }, 'Max output tokens configured');
     }
 
     const rawMessages = toChatMessages(messages);
@@ -295,7 +312,7 @@ export const handleChatCompletion = async (
 
     const service = getAugmentService();
 
-    console.log(`[Chat] Model: ${model}, Messages: ${String(messages.length)}, Stream: ${String(stream)}`);
+    logger.info({ model, messageCount: messages.length, stream }, 'Processing chat completion');
 
     if (stream) {
       // Set SSE headers
@@ -306,14 +323,44 @@ export const handleChatCompletion = async (
       // Create stream context for consistent ID across all chunks
       const ctx = createStreamContext();
 
-      // Stream chunks
-      for await (const chunk of service.streamCompletion(chatMessages, model, generationOptions)) {
-        res.write(toSSE(buildStreamChunk(ctx, chunk, model)));
+      // Check if usage should be included in streaming response
+      const includeUsage = stream_options?.include_usage === true;
+
+      // Stream chunks with usage tracking
+      let streamingUsage: TokenUsage | undefined;
+      for await (const chunk of service.streamCompletionWithUsage(chatMessages, model, generationOptions)) {
+        if (chunk.type === 'text') {
+          // Per OpenAI spec: intermediate chunks have usage: null when include_usage=true
+          res.write(toSSE(buildStreamChunk(ctx, chunk.text, model, false, includeUsage ? null : undefined)));
+        } else if (includeUsage) {
+          // chunk.type === 'finish' - Always include usage when requested, with fallback to zeros
+          const { inputTokens, outputTokens, totalTokens } = chunk.usage;
+          streamingUsage = {
+            prompt_tokens: inputTokens ?? 0,
+            completion_tokens: outputTokens ?? 0,
+            total_tokens: totalTokens ?? ((inputTokens ?? 0) + (outputTokens ?? 0)),
+            prompt_tokens_details: DEFAULT_PROMPT_TOKENS_DETAILS,
+            completion_tokens_details: DEFAULT_COMPLETION_TOKENS_DETAILS,
+          };
+        }
       }
 
-      // Send final chunk and done signal
-      // Note: Token usage in streaming requires Augment SDK support (not yet available)
-      res.write(toSSE(buildStreamChunk(ctx, '', model, true)));
+      // Per OpenAI spec: finish chunk has usage: null when include_usage=true
+      res.write(toSSE(buildStreamChunk(ctx, '', model, true, includeUsage ? null : undefined)));
+
+      // Per OpenAI spec: additional usage-only chunk with choices: [] when include_usage=true
+      if (streamingUsage !== undefined) {
+        const usageChunk: StreamChunkResponse = {
+          id: ctx.id,
+          object: 'chat.completion.chunk',
+          created: ctx.created,
+          model,
+          system_fingerprint: ctx.systemFingerprint,
+          choices: [],
+          usage: streamingUsage,
+        };
+        res.write(toSSE(usageChunk));
+      }
       res.write('data: [DONE]\n\n');
       res.end();
     } else {
@@ -322,8 +369,18 @@ export const handleChatCompletion = async (
       res.json(buildCompletionResponse(result.text, model, result.usage));
     }
   } catch (error) {
-    console.error('[Chat] Error:', error);
-    next(error);
+    logger.error({ err: error }, 'Chat completion error');
+    // If headers already sent (streaming in progress), gracefully end the stream
+    if (res.headersSent) {
+      try {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } catch {
+        res.end();
+      }
+    } else {
+      next(error);
+    }
   }
 };
 

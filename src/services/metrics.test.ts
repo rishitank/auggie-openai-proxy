@@ -4,7 +4,14 @@
  * Verifies Prometheus metrics collection
  */
 
-import { recordRequest, getPrometheusMetrics, getMetricsJson } from './metrics';
+import {
+  recordRequest,
+  recordLatency,
+  incrementActiveConnections,
+  decrementActiveConnections,
+  getPrometheusMetrics,
+  getMetricsJson,
+} from './metrics';
 
 describe('services/metrics', () => {
   describe('recordRequest', () => {
@@ -98,6 +105,76 @@ describe('services/metrics', () => {
     it('should have non-negative uptime', () => {
       const json = getMetricsJson();
       expect(json.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('recordLatency', () => {
+    it('should record latency for an endpoint', () => {
+      const endpoint = 'GET /latency-test';
+      recordLatency(endpoint, 150);
+      const json = getMetricsJson();
+      const histogram = json.latencyByEndpoint[endpoint];
+      expect(histogram).toBeDefined();
+      expect(histogram?.count).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should increment histogram bucket counts', () => {
+      const endpoint = 'GET /bucket-test';
+      recordLatency(endpoint, 75); // Should fall in 100ms bucket and above
+      const json = getMetricsJson();
+      const histogram = json.latencyByEndpoint[endpoint];
+      expect(histogram).toBeDefined();
+      expect(histogram?.buckets[100]).toBeGreaterThanOrEqual(1);
+      expect(histogram?.buckets[250]).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should accumulate sum and count', () => {
+      const endpoint = 'GET /accumulate-test';
+      recordLatency(endpoint, 100);
+      recordLatency(endpoint, 200);
+      const json = getMetricsJson();
+      const histogram = json.latencyByEndpoint[endpoint];
+      expect(histogram).toBeDefined();
+      expect(histogram?.count).toBeGreaterThanOrEqual(2);
+      expect(histogram?.sum).toBeGreaterThanOrEqual(300);
+    });
+
+    it('should include latency histogram in Prometheus output', () => {
+      recordLatency('GET /prom-latency', 50);
+      const output = getPrometheusMetrics();
+      expect(output).toContain('auggie_request_duration_ms');
+      expect(output).toContain('auggie_request_duration_ms_bucket');
+    });
+  });
+
+  describe('activeConnections', () => {
+    it('should increment active connections', () => {
+      const before = getMetricsJson().activeConnections;
+      incrementActiveConnections();
+      const after = getMetricsJson().activeConnections;
+      expect(after).toBe(before + 1);
+    });
+
+    it('should decrement active connections', () => {
+      incrementActiveConnections();
+      const before = getMetricsJson().activeConnections;
+      decrementActiveConnections();
+      const after = getMetricsJson().activeConnections;
+      expect(after).toBe(before - 1);
+    });
+
+    it('should not go below zero', () => {
+      // Ensure we start at 0
+      while (getMetricsJson().activeConnections > 0) {
+        decrementActiveConnections();
+      }
+      decrementActiveConnections();
+      expect(getMetricsJson().activeConnections).toBe(0);
+    });
+
+    it('should include active connections in Prometheus output', () => {
+      const output = getPrometheusMetrics();
+      expect(output).toContain('auggie_active_connections');
     });
   });
 });
