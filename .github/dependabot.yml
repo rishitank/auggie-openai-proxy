@@ -30,6 +30,18 @@ updates:
         update-types:
           - 'minor'
           - 'patch'
+      # Major bumps arrive together so coordinated upgrades (e.g. vitest +
+      # @vitest/coverage-v8) land in one PR instead of a string of singles
+      major-updates:
+        patterns:
+          - '*'
+        update-types:
+          - 'major'
+      # Security updates are not covered by the version-update groups above
+      security-updates:
+        applies-to: 'security-updates'
+        patterns:
+          - '*'
 
   # GitHub Actions
   - package-ecosystem: 'github-actions'
@@ -46,6 +58,10 @@ updates:
       - 'dependencies'
       - 'ci'
       - 'automated'
+    groups:
+      github-actions:
+        patterns:
+          - '*'
 
   # Docker
   - package-ecosystem: 'docker'
@@ -62,3 +78,7 @@ updates:
       - 'dependencies'
       - 'docker'
       - 'automated'
+    groups:
+      docker-images:
+        patterns:
+          - '*'
