@@ -23,7 +23,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       pr: ${{ steps.release.outputs.pr }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -33,7 +33,7 @@ jobs:
       # Auto-merge the Release PR so every merge to main triggers a release
       - name: Auto-merge Release PR
         if: steps.release.outputs.pr
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = ${{ steps.release.outputs.pr }};
@@ -57,10 +57,10 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
@@ -86,7 +86,7 @@ jobs:
             .nvmrc
 
       - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: |
