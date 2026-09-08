@@ -65,7 +65,7 @@
   "author": "Rishi Tank <tank.rishi@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "@augmentcode/auggie-sdk": "^0.1.15",
+    "@augmentcode/auggie-sdk": "^0.1.18",
     "compression": "^1.8.1",
     "express": "^5.1.0",
     "openai": "^6.22.0",
@@ -80,14 +80,14 @@
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.3",
     "@types/node": "^25.2.1",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.28.0",
     "eslint-config-prettier": "^10.1.5",
     "husky": "^9.1.7",
     "tsup": "^8.5.1",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.34.0",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "jsondiffpatch": ">=0.7.2",
