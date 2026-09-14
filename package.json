@@ -68,7 +68,7 @@
     "@augmentcode/auggie-sdk": "^0.1.15",
     "compression": "^1.8.1",
     "express": "^5.1.0",
-    "openai": "^6.22.0",
+    "openai": "^7.15.0",
     "pino": "^10.3.1",
     "zod": "^4.3.6"
   },
