@@ -17,9 +17,15 @@ jobs:
     # where the shared preset (github>rishitank/.github:node) allows it. Majors,
     # Node/npm bumps and production minors are meant to wait for a human, and
     # arming auto-merge here would bypass that policy.
+    # PRs opened by a human account (including agent PRs) are skipped too: the
+    # owner merges those. The review-gate ruleset counts a CodeRabbit approval as
+    # the required review, so arming them here would merge them the moment
+    # CodeRabbit approved. Only other bot PRs (Dependabot, release) are armed, and
+    # those still need the owner's approval because CodeRabbit skips bot PRs.
     if: |
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.type == 'Bot' &&
       github.event.pull_request.user.login != 'renovate[bot]'
     steps:
       - name: Enable auto-merge (squash)
