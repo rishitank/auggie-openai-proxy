@@ -23,14 +23,18 @@ interface IndexFile {
 }
 
 /**
- * Flags for opening workspace files: read-only and, where the platform has it,
- * O_NOFOLLOW so open() fails with ELOOP if the final path component has been
- * swapped for a symlink since readdir() reported a regular file.
+ * Flags for opening workspace files: read-only and, where the platform has them:
+ * - O_NOFOLLOW, so open() fails with ELOOP if the final path component has been
+ *   swapped for a symlink since readdir() reported a regular file;
+ * - O_NONBLOCK, so open() returns at once if the path has been swapped for a
+ *   FIFO, instead of blocking until a writer appears. The fstat() check in
+ *   readFileWithinLimit() then rejects it as not a regular file. O_NONBLOCK
+ *   has no effect on reads from regular files.
  */
 const READ_NO_FOLLOW =
   process.platform === 'win32'
     ? fsConstants.O_RDONLY
-    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK;
 
 /**
  * Read a regular file if it is no larger than `maxBytes`.
@@ -307,4 +311,3 @@ export const initializeContextService = async (
   await contextServiceInstance.initialize();
   return contextServiceInstance;
 };
-

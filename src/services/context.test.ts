@@ -414,10 +414,12 @@ describe('services/context', () => {
         await service.initialize();
         await service.indexWorkspace('/workspace');
 
+        // O_NONBLOCK: a path swapped for a FIFO must not block open() before
+        // the fstat() file-type check can reject it.
         const expectedFlags =
           process.platform === 'win32'
             ? fsConstants.O_RDONLY
-            : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+            : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK;
         expect(fsMock.open).toHaveBeenCalledWith('/workspace/ok.ts', expectedFlags);
         expect(handle.stat).toHaveBeenCalledTimes(1);
         expect(handle.read).toHaveBeenCalled();
@@ -616,4 +618,3 @@ describe('services/context', () => {
     });
   });
 });
-
