@@ -1,0 +1,46 @@
+name: zz-tmp-lockfile
+
+on:
+  push:
+    branches: [fix/security-dependabot-alerts]
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/security-dependabot-alerts
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '26'
+
+      - name: Regenerate package-lock.json
+        run: |
+          set -euo pipefail
+          node -v
+          npm -v
+          # 1. Resolve the new direct ranges (auggie-sdk ^0.1.18, vitest ^4.1.11, js-yaml override)
+          npm install --package-lock-only --ignore-scripts
+          # 2. Lift only the vulnerable transitive packages to their newest in-range versions
+          npm update --package-lock-only --ignore-scripts qs ajv minimatch rollup flatted path-to-regexp brace-expansion js-yaml body-parser fast-uri @humanfs/node
+          # 3. Settle the tree
+          npm install --package-lock-only --ignore-scripts
+          npm audit --audit-level=low
+
+      - name: Commit lockfile
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package-lock.json; then
+            echo 'package-lock.json unchanged'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'fix(security): regenerate package-lock.json'
+          git push origin HEAD:fix/security-dependabot-alerts
