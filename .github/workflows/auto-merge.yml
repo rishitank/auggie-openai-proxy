@@ -12,10 +12,15 @@ jobs:
   auto-merge:
     name: Enable Auto-Merge
     runs-on: ubuntu-latest
-    # Don't run on draft PRs or forked PRs
+    # Don't run on draft PRs or forked PRs.
+    # Renovate PRs are skipped: Renovate arms GitHub auto-merge itself, but only
+    # where the shared preset (github>rishitank/.github:node) allows it. Majors,
+    # Node/npm bumps and production minors are meant to wait for a human, and
+    # arming auto-merge here would bypass that policy.
     if: |
       github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'renovate[bot]'
     steps:
       - name: Enable auto-merge (squash)
         # Using PAT instead of GITHUB_TOKEN so that the merge triggers the 'closed' event
