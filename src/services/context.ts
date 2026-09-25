@@ -40,8 +40,9 @@ const READ_NO_FOLLOW =
  * previous path-based stat() followed by readFile() let the path be replaced
  * between the two calls (CWE-367, time-of-check to time-of-use).
  *
- * The size is re-checked on the bytes actually read, in case the file grew
- * after fstat.
+ * The read itself is bounded: at most `maxBytes + 1` bytes are ever read, so a
+ * file that grows after fstat cannot make us allocate more than the limit. If
+ * the extra byte arrives, the file is over the limit and is skipped.
  *
  * @returns the UTF-8 contents, or null if the path is not a regular file or
  *   exceeds the limit. Errors from open/read (missing file, EACCES, ELOOP)
@@ -54,11 +55,21 @@ const readFileWithinLimit = async (filePath: string, maxBytes: number): Promise<
     if (!stat.isFile() || stat.size > maxBytes) {
       return null;
     }
-    const data = await handle.readFile();
-    if (data.byteLength > maxBytes) {
+
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let total = 0;
+    while (total < buffer.length) {
+      const { bytesRead } = await handle.read(buffer, total, buffer.length - total, total);
+      if (bytesRead === 0) {
+        break;
+      }
+      total += bytesRead;
+    }
+
+    if (total > maxBytes) {
       return null;
     }
-    return data.toString('utf-8');
+    return buffer.toString('utf-8', 0, total);
   } finally {
     await handle.close();
   }

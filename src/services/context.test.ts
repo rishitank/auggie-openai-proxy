@@ -5,31 +5,46 @@
  */
 
 import { ContextService, getContextService, initializeContextService } from './context';
-import { constants as fsConstants } from 'node:fs';
+import { constants as fsConstants, type Stats } from 'node:fs';
 import * as fs from 'node:fs/promises';
+import type { FileHandle } from 'node:fs/promises';
+import type { Mock } from 'vitest';
 
-/** Minimal FileHandle surface used by ContextService */
+/** The positional FileHandle.read overload used by ContextService */
+type PositionalRead = (
+  buffer: Buffer,
+  offset: number,
+  length: number,
+  position: number
+) => Promise<{ bytesRead: number; buffer: Buffer }>;
+
+/** Minimal FileHandle surface used by ContextService, typed against the Node API */
 interface MockFileHandle {
-  stat: ReturnType<typeof vi.fn>;
-  readFile: ReturnType<typeof vi.fn>;
-  close: ReturnType<typeof vi.fn>;
+  stat: Mock<() => Promise<Pick<Stats, 'size' | 'isFile'>>>;
+  read: Mock<PositionalRead>;
+  close: Mock<FileHandle['close']>;
 }
 
 /**
  * Create a mock FileHandle. Hoisted so the vi.mock factory below can use it.
+ * `read` behaves like a positional pread() over `contents`.
  */
 const { createMockFileHandle } = vi.hoisted(() => ({
   createMockFileHandle: (
     options: { size?: number; isFile?: boolean; contents?: string } = {}
   ): MockFileHandle => {
-    const contents = options.contents ?? 'file content';
+    const source = Buffer.from(options.contents ?? 'file content', 'utf-8');
     return {
-      stat: vi.fn().mockResolvedValue({
-        size: options.size ?? Buffer.byteLength(contents),
+      stat: vi.fn<() => Promise<Pick<Stats, 'size' | 'isFile'>>>().mockResolvedValue({
+        size: options.size ?? source.byteLength,
         isFile: () => options.isFile ?? true,
       }),
-      readFile: vi.fn().mockResolvedValue(Buffer.from(contents, 'utf-8')),
-      close: vi.fn().mockResolvedValue(undefined),
+      read: vi.fn<PositionalRead>((buffer, offset, length, position) => {
+        const bytesRead = Math.max(0, Math.min(length, source.byteLength - position));
+        source.copy(buffer, offset, position, position + bytesRead);
+        return Promise.resolve({ bytesRead, buffer });
+      }),
+      close: vi.fn<FileHandle['close']>().mockResolvedValue(undefined),
     };
   },
 }));
@@ -362,7 +377,7 @@ describe('services/context', () => {
 
         // The size check uses the open handle, and large files are never read
         expect(handle.stat).toHaveBeenCalledTimes(1);
-        expect(handle.readFile).not.toHaveBeenCalled();
+        expect(handle.read).not.toHaveBeenCalled();
         expect(handle.close).toHaveBeenCalledTimes(1);
       });
 
@@ -405,7 +420,7 @@ describe('services/context', () => {
             : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
         expect(fsMock.open).toHaveBeenCalledWith('/workspace/ok.ts', expectedFlags);
         expect(handle.stat).toHaveBeenCalledTimes(1);
-        expect(handle.readFile).toHaveBeenCalledTimes(1);
+        expect(handle.read).toHaveBeenCalled();
         expect(handle.close).toHaveBeenCalledTimes(1);
         expect(await lastIndexedFiles()).toEqual([{ path: 'ok.ts', contents: 'export const x = 1;' }]);
       });
@@ -420,7 +435,7 @@ describe('services/context', () => {
         await service.initialize();
         await service.indexWorkspace('/workspace');
 
-        expect(handle.readFile).not.toHaveBeenCalled();
+        expect(handle.read).not.toHaveBeenCalled();
         expect(handle.close).toHaveBeenCalledTimes(1);
       });
 
@@ -452,17 +467,67 @@ describe('services/context', () => {
         await service.initialize();
         await service.indexWorkspace('/workspace');
 
-        expect(handle.readFile).toHaveBeenCalledTimes(1);
+        expect(handle.read).toHaveBeenCalled();
         expect(handle.close).toHaveBeenCalledTimes(1);
-        expect(fsMock.readdir).toHaveBeenCalledTimes(1);
         expect(await lastIndexedFiles()).toEqual([]);
+      });
+
+      it('should never read more than maxFileSize + 1 bytes from a growing file', async () => {
+        const fsMock = vi.mocked(fs);
+        fsMock.readdir.mockResolvedValueOnce([mockDirent('growing.ts', false)]);
+        const handle = createMockFileHandle({ size: 10, contents: 'x'.repeat(10_000) });
+        mockNextOpen(handle);
+
+        const service = new ContextService({ enabled: true, maxFileSize: 100 });
+        await service.initialize();
+        await service.indexWorkspace('/workspace');
+
+        expect(handle.read).toHaveBeenCalled();
+        const requested = handle.read.mock.calls.reduce((sum, [, , length]) => sum + length, 0);
+        const bufferSizes = handle.read.mock.calls.map(([buffer]) => buffer.length);
+        expect(requested).toBeLessThanOrEqual(101);
+        expect(bufferSizes.every((size) => size === 101)).toBe(true);
+        expect(await lastIndexedFiles()).toEqual([]);
+      });
+
+      it('should index a file exactly at maxFileSize', async () => {
+        const fsMock = vi.mocked(fs);
+        fsMock.readdir.mockResolvedValueOnce([mockDirent('exact.ts', false)]);
+        mockNextOpen(createMockFileHandle({ contents: 'y'.repeat(100) }));
+
+        const service = new ContextService({ enabled: true, maxFileSize: 100 });
+        await service.initialize();
+        await service.indexWorkspace('/workspace');
+
+        expect(await lastIndexedFiles()).toEqual([{ path: 'exact.ts', contents: 'y'.repeat(100) }]);
+      });
+
+      it('should assemble contents delivered across several short reads', async () => {
+        const fsMock = vi.mocked(fs);
+        fsMock.readdir.mockResolvedValueOnce([mockDirent('chunked.ts', false)]);
+        const handle = createMockFileHandle({ contents: 'abcdef' });
+        const source = Buffer.from('abcdef');
+        handle.read.mockImplementation((buffer, offset, length, position) => {
+          // Deliver at most 2 bytes per call, like a slow or interrupted read
+          const bytesRead = Math.max(0, Math.min(2, length, source.byteLength - position));
+          source.copy(buffer, offset, position, position + bytesRead);
+          return Promise.resolve({ bytesRead, buffer });
+        });
+        mockNextOpen(handle);
+
+        const service = new ContextService({ enabled: true });
+        await service.initialize();
+        await service.indexWorkspace('/workspace');
+
+        expect(handle.read.mock.calls.length).toBeGreaterThan(1);
+        expect(await lastIndexedFiles()).toEqual([{ path: 'chunked.ts', contents: 'abcdef' }]);
       });
 
       it('should close the file handle even when reading fails', async () => {
         const fsMock = vi.mocked(fs);
         fsMock.readdir.mockResolvedValueOnce([mockDirent('broken.ts', false)]);
         const handle = createMockFileHandle();
-        handle.readFile.mockRejectedValueOnce(new Error('EIO'));
+        handle.read.mockRejectedValueOnce(new Error('EIO'));
         mockNextOpen(handle);
 
         const service = new ContextService({ enabled: true });
