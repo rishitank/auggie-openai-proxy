@@ -334,7 +334,8 @@ describe('services/context', () => {
       });
     });
 
-    describe('indexWorkspace', () => {
+    // Workspace indexing is POSIX-only (it is disabled on Windows, see below).
+    describe.skipIf(process.platform === 'win32')('indexWorkspace', () => {
       it('should index files in workspace directory', async () => {
         const fsMock = vi.mocked(fs);
         fsMock.readdir.mockResolvedValueOnce([
@@ -414,12 +415,10 @@ describe('services/context', () => {
         await service.initialize();
         await service.indexWorkspace('/workspace');
 
+        // O_NOFOLLOW: a path swapped for a symlink fails with ELOOP.
         // O_NONBLOCK: a path swapped for a FIFO must not block open() before
         // the fstat() file-type check can reject it.
-        const expectedFlags =
-          process.platform === 'win32'
-            ? fsConstants.O_RDONLY
-            : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK;
+        const expectedFlags = fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK;
         expect(fsMock.open).toHaveBeenCalledWith('/workspace/ok.ts', expectedFlags);
         expect(handle.stat).toHaveBeenCalledTimes(1);
         expect(handle.read).toHaveBeenCalled();
@@ -556,7 +555,36 @@ describe('services/context', () => {
       });
     });
 
-    describe('initialize with workspace', () => {
+    describe('indexWorkspace on Windows', () => {
+      const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+
+      beforeEach(() => {
+        Object.defineProperty(process, 'platform', { value: 'win32' });
+      });
+
+      afterEach(() => {
+        if (platform) {
+          Object.defineProperty(process, 'platform', platform);
+        }
+      });
+
+      it('should refuse to index, because reparse points cannot be refused on open', async () => {
+        const fsMock = vi.mocked(fs);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+        const service = new ContextService({ enabled: true });
+        await service.initialize();
+        await service.indexWorkspace('C:\\workspace');
+
+        expect(fsMock.readdir).not.toHaveBeenCalled();
+        expect(fsMock.open).not.toHaveBeenCalled();
+        expect(await lastIndexedFiles()).toEqual([]);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('disabled on Windows'));
+        warn.mockRestore();
+      });
+    });
+
+    describe.skipIf(process.platform === 'win32')('initialize with workspace', () => {
       it('should auto-index workspace when workspaceDir is configured', async () => {
         const fsMock = vi.mocked(fs);
         fsMock.readdir.mockResolvedValueOnce([]);

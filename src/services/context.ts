@@ -23,7 +23,16 @@ interface IndexFile {
 }
 
 /**
- * Flags for opening workspace files: read-only and, where the platform has them:
+ * Workspace indexing needs an open() that refuses to follow a symlink swapped in
+ * after readdir(). Node exposes O_NOFOLLOW on POSIX only; on Windows there is no
+ * way to open a file without following reparse points (symlinks, junctions), so
+ * a path-based check could always be raced. Indexing is therefore disabled on
+ * Windows rather than done unsafely.
+ */
+const isWorkspaceIndexingSupported = (): boolean => process.platform !== 'win32';
+
+/**
+ * Flags for opening workspace files (POSIX only, see above): read-only, plus
  * - O_NOFOLLOW, so open() fails with ELOOP if the final path component has been
  *   swapped for a symlink since readdir() reported a regular file;
  * - O_NONBLOCK, so open() returns at once if the path has been swapped for a
@@ -31,10 +40,7 @@ interface IndexFile {
  *   readFileWithinLimit() then rejects it as not a regular file. O_NONBLOCK
  *   has no effect on reads from regular files.
  */
-const READ_NO_FOLLOW =
-  process.platform === 'win32'
-    ? fsConstants.O_RDONLY
-    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK;
+const READ_NO_FOLLOW = fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK;
 
 /**
  * Read a regular file if it is no larger than `maxBytes`.
@@ -162,6 +168,14 @@ export class ContextService {
   async indexWorkspace(workspaceDir: string): Promise<void> {
     if (!this.context) {
       throw new Error('Context not initialized');
+    }
+
+    if (!isWorkspaceIndexingSupported()) {
+      console.warn(
+        '[Context] Workspace indexing is disabled on Windows: files cannot be opened without ' +
+          'following symlinks or junctions, so the workspace boundary cannot be enforced'
+      );
+      return;
     }
 
     console.log(`[Context] Indexing workspace: ${workspaceDir}`);
