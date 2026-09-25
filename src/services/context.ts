@@ -12,6 +12,7 @@
  */
 
 import { DirectContext } from '@augmentcode/auggie-sdk';
+import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -20,6 +21,48 @@ interface IndexFile {
   readonly path: string;
   readonly contents: string;
 }
+
+/**
+ * Flags for opening workspace files: read-only and, where the platform has it,
+ * O_NOFOLLOW so open() fails with ELOOP if the final path component has been
+ * swapped for a symlink since readdir() reported a regular file.
+ */
+const READ_NO_FOLLOW =
+  process.platform === 'win32'
+    ? fsConstants.O_RDONLY
+    : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+
+/**
+ * Read a regular file if it is no larger than `maxBytes`.
+ *
+ * The file is opened once and every check goes through that handle (fstat,
+ * then read), so the check and the read always refer to the same file. The
+ * previous path-based stat() followed by readFile() let the path be replaced
+ * between the two calls (CWE-367, time-of-check to time-of-use).
+ *
+ * The size is re-checked on the bytes actually read, in case the file grew
+ * after fstat.
+ *
+ * @returns the UTF-8 contents, or null if the path is not a regular file or
+ *   exceeds the limit. Errors from open/read (missing file, EACCES, ELOOP)
+ *   propagate to the caller.
+ */
+const readFileWithinLimit = async (filePath: string, maxBytes: number): Promise<string | null> => {
+  const handle = await fs.open(filePath, READ_NO_FOLLOW);
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > maxBytes) {
+      return null;
+    }
+    const data = await handle.readFile();
+    if (data.byteLength > maxBytes) {
+      return null;
+    }
+    return data.toString('utf-8');
+  } finally {
+    await handle.close();
+  }
+};
 
 /** Context service configuration */
 interface ContextServiceConfig {
@@ -157,13 +200,13 @@ export class ContextService {
         const ext = path.extname(entry.name).toLowerCase();
         if (this.config.fileExtensions.includes(ext)) {
           try {
-            const stat = await fs.stat(fullPath);
-            if (stat.size <= this.config.maxFileSize) {
-              const contents = await fs.readFile(fullPath, 'utf-8');
+            const contents = await readFileWithinLimit(fullPath, this.config.maxFileSize);
+            if (contents !== null) {
               files.push({ path: relativePath, contents });
             }
           } catch {
-            // Skip files that can't be read
+            // Skip files that can't be opened or read (removed, EACCES, or
+            // ELOOP because the path was swapped for a symlink)
           }
         }
       }

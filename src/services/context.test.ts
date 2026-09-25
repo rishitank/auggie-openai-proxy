@@ -5,7 +5,51 @@
  */
 
 import { ContextService, getContextService, initializeContextService } from './context';
+import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
+
+/** Minimal FileHandle surface used by ContextService */
+interface MockFileHandle {
+  stat: ReturnType<typeof vi.fn>;
+  readFile: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+}
+
+/**
+ * Create a mock FileHandle. Hoisted so the vi.mock factory below can use it.
+ */
+const { createMockFileHandle } = vi.hoisted(() => ({
+  createMockFileHandle: (
+    options: { size?: number; isFile?: boolean; contents?: string } = {}
+  ): MockFileHandle => {
+    const contents = options.contents ?? 'file content';
+    return {
+      stat: vi.fn().mockResolvedValue({
+        size: options.size ?? Buffer.byteLength(contents),
+        isFile: () => options.isFile ?? true,
+      }),
+      readFile: vi.fn().mockResolvedValue(Buffer.from(contents, 'utf-8')),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+  },
+}));
+
+/** Queue a mock FileHandle as the result of the next fs.open() call */
+const mockNextOpen = (handle: MockFileHandle): void => {
+  vi.mocked(fs).open.mockResolvedValueOnce(handle as unknown as Awaited<ReturnType<typeof fs.open>>);
+};
+
+/** Files passed to the most recent DirectContext.addToIndex call */
+const lastIndexedFiles = async (): Promise<{ path: string; contents: string }[]> => {
+  const sdk = await import('@augmentcode/auggie-sdk');
+  const createResult = vi.mocked(sdk.DirectContext).create.mock.results.at(-1);
+  if (createResult?.type !== 'return') {
+    return [];
+  }
+  const ctx = (await createResult.value) as unknown as MockDirectContext;
+  const call = ctx.addToIndex.mock.calls.at(-1) as [{ path: string; contents: string }[]] | undefined;
+  return call?.[0] ?? [];
+};
 
 /**
  * Mock DirectContext interface matching the actual DirectContext type
@@ -39,12 +83,12 @@ vi.mock('@augmentcode/auggie-sdk', () => ({
   },
 }));
 
-// Mock fs module
+// Mock fs module. Workspace files are read through a FileHandle (open, then
+// fstat and read on the same handle), never via path-based stat/readFile.
 vi.mock('node:fs/promises', () => ({
   access: vi.fn().mockRejectedValue(new Error('File not found')),
   readdir: vi.fn().mockResolvedValue([]),
-  stat: vi.fn().mockResolvedValue({ size: 1000 }),
-  readFile: vi.fn().mockResolvedValue('file content'),
+  open: vi.fn().mockImplementation(() => Promise.resolve(createMockFileHandle())),
 }));
 
 describe('services/context', () => {
@@ -309,14 +353,17 @@ describe('services/context', () => {
       it('should skip files larger than maxFileSize', async () => {
         const fsMock = vi.mocked(fs);
         fsMock.readdir.mockResolvedValueOnce([mockDirent('large.ts', false)]);
-        fsMock.stat.mockResolvedValueOnce({ size: 200 * 1024 } as Awaited<ReturnType<typeof fs.stat>>);
+        const handle = createMockFileHandle({ size: 200 * 1024 });
+        mockNextOpen(handle);
 
         const service = new ContextService({ enabled: true, maxFileSize: 100 * 1024 });
         await service.initialize();
         await service.indexWorkspace('/workspace');
 
-        // readFile should not be called for large files
-        expect(fsMock.readFile).not.toHaveBeenCalled();
+        // The size check uses the open handle, and large files are never read
+        expect(handle.stat).toHaveBeenCalledTimes(1);
+        expect(handle.readFile).not.toHaveBeenCalled();
+        expect(handle.close).toHaveBeenCalledTimes(1);
       });
 
       it('should skip files with unsupported extensions', async () => {
@@ -327,13 +374,13 @@ describe('services/context', () => {
         await service.initialize();
         await service.indexWorkspace('/workspace');
 
-        expect(fsMock.stat).not.toHaveBeenCalled();
+        expect(fsMock.open).not.toHaveBeenCalled();
       });
 
       it('should handle file read errors gracefully', async () => {
         const fsMock = vi.mocked(fs);
         fsMock.readdir.mockResolvedValueOnce([mockDirent('file.ts', false)]);
-        fsMock.stat.mockRejectedValueOnce(new Error('Permission denied'));
+        fsMock.open.mockRejectedValueOnce(new Error('Permission denied'));
 
         const service = new ContextService({ enabled: true });
         await service.initialize();
@@ -342,10 +389,93 @@ describe('services/context', () => {
         await expect(service.indexWorkspace('/workspace')).resolves.not.toThrow();
       });
 
+      it('should read file contents through the same handle it checked', async () => {
+        const fsMock = vi.mocked(fs);
+        fsMock.readdir.mockResolvedValueOnce([mockDirent('ok.ts', false)]);
+        const handle = createMockFileHandle({ contents: 'export const x = 1;' });
+        mockNextOpen(handle);
+
+        const service = new ContextService({ enabled: true });
+        await service.initialize();
+        await service.indexWorkspace('/workspace');
+
+        const expectedFlags =
+          process.platform === 'win32'
+            ? fsConstants.O_RDONLY
+            : fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW;
+        expect(fsMock.open).toHaveBeenCalledWith('/workspace/ok.ts', expectedFlags);
+        expect(handle.stat).toHaveBeenCalledTimes(1);
+        expect(handle.readFile).toHaveBeenCalledTimes(1);
+        expect(handle.close).toHaveBeenCalledTimes(1);
+        expect(await lastIndexedFiles()).toEqual([{ path: 'ok.ts', contents: 'export const x = 1;' }]);
+      });
+
+      it('should skip a path that is no longer a regular file when opened', async () => {
+        const fsMock = vi.mocked(fs);
+        fsMock.readdir.mockResolvedValueOnce([mockDirent('swapped.ts', false)]);
+        const handle = createMockFileHandle({ isFile: false });
+        mockNextOpen(handle);
+
+        const service = new ContextService({ enabled: true });
+        await service.initialize();
+        await service.indexWorkspace('/workspace');
+
+        expect(handle.readFile).not.toHaveBeenCalled();
+        expect(handle.close).toHaveBeenCalledTimes(1);
+      });
+
+      it('should skip a path swapped for a symlink (ELOOP from O_NOFOLLOW)', async () => {
+        const fsMock = vi.mocked(fs);
+        fsMock.readdir.mockResolvedValueOnce([
+          mockDirent('swapped.ts', false),
+          mockDirent('ok.ts', false),
+        ]);
+        fsMock.open.mockRejectedValueOnce(
+          Object.assign(new Error('ELOOP: too many symbolic links encountered'), { code: 'ELOOP' })
+        );
+        mockNextOpen(createMockFileHandle({ contents: 'ok' }));
+
+        const service = new ContextService({ enabled: true });
+        await service.initialize();
+        await service.indexWorkspace('/workspace');
+
+        expect(await lastIndexedFiles()).toEqual([{ path: 'ok.ts', contents: 'ok' }]);
+      });
+
+      it('should skip a file that grew past maxFileSize after it was checked', async () => {
+        const fsMock = vi.mocked(fs);
+        fsMock.readdir.mockResolvedValueOnce([mockDirent('growing.ts', false)]);
+        const handle = createMockFileHandle({ size: 10, contents: 'x'.repeat(200) });
+        mockNextOpen(handle);
+
+        const service = new ContextService({ enabled: true, maxFileSize: 100 });
+        await service.initialize();
+        await service.indexWorkspace('/workspace');
+
+        expect(handle.readFile).toHaveBeenCalledTimes(1);
+        expect(handle.close).toHaveBeenCalledTimes(1);
+        expect(fsMock.readdir).toHaveBeenCalledTimes(1);
+        expect(await lastIndexedFiles()).toEqual([]);
+      });
+
+      it('should close the file handle even when reading fails', async () => {
+        const fsMock = vi.mocked(fs);
+        fsMock.readdir.mockResolvedValueOnce([mockDirent('broken.ts', false)]);
+        const handle = createMockFileHandle();
+        handle.readFile.mockRejectedValueOnce(new Error('EIO'));
+        mockNextOpen(handle);
+
+        const service = new ContextService({ enabled: true });
+        await service.initialize();
+
+        await expect(service.indexWorkspace('/workspace')).resolves.toBeUndefined();
+        expect(handle.close).toHaveBeenCalledTimes(1);
+      });
+
       it('should save state file after indexing when configured', async () => {
         const fsMock = vi.mocked(fs);
         fsMock.readdir.mockResolvedValueOnce([mockDirent('file.ts', false)]);
-        fsMock.stat.mockResolvedValueOnce({ size: 100 } as Awaited<ReturnType<typeof fs.stat>>);
+        mockNextOpen(createMockFileHandle({ size: 100 }));
 
         const service = new ContextService({
           enabled: true,

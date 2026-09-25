@@ -13,6 +13,7 @@ import type { Request, Response, NextFunction } from 'express';
 import OpenAI from 'openai';
 import { WebhookRequestSchema, createErrorResponse } from '#types';
 import { loadConfig, type WebhookConfig } from '#config';
+import { sanitizeForLog } from '#services/log-sanitizer';
 
 /** Cache of OpenAI clients per webhook (keyed by baseURL + apiKey) */
 const clientCache = new Map<string, OpenAI>();
@@ -125,7 +126,11 @@ export const handleWebhook = async (
     const model = body.model ?? webhook.model ?? config.defaultModel;
     const systemPrompt = body.system_prompt ?? webhook.systemPrompt;
 
-    console.log(`[Webhook:${webhookName}] Model: ${model}, PromptLength: ${String(prompt.length)}`);
+    // webhookName comes from the URL and model can come from the request body:
+    // strip CR/LF and other control characters so neither can forge log lines.
+    console.log(
+      `[Webhook:${sanitizeForLog(webhookName)}] Model: ${sanitizeForLog(model)}, PromptLength: ${String(prompt.length)}`
+    );
 
     // Build messages array
     const messages: { role: 'system' | 'user'; content: string }[] = [];
