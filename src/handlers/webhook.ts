@@ -108,7 +108,7 @@ export const handleWebhook = async (
     }
 
     const body = parseResult.data;
-    const prompt = extractPrompt(body as Record<string, unknown>);
+    const prompt = extractPrompt(body);
 
     if (prompt === null) {
       res.status(400).json(

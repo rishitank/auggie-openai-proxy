@@ -124,7 +124,7 @@ describe('types', () => {
             { type: 'text', text: ' What do you see?' },
           ],
         };
-        const result = normalizeMessageContent(msg as Parameters<typeof normalizeMessageContent>[0]);
+        const result = normalizeMessageContent(msg);
         expect(result.content).toBe('Here is an image:  What do you see?');
       });
 
@@ -135,7 +135,7 @@ describe('types', () => {
             { type: 'image_url', image_url: { url: 'https://example.com/img.jpg' } },
           ],
         };
-        const result = normalizeMessageContent(msg as Parameters<typeof normalizeMessageContent>[0]);
+        const result = normalizeMessageContent(msg);
         expect(result.content).toBe('');
       });
     });

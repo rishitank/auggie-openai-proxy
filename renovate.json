@@ -2,5 +2,13 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "Hold TypeScript 7: @augmentcode/auggie-sdk (through 0.2.0) peers typescript ^5 and typescript-eslint 8.x peers typescript <6.1.0, so npm ci fails with ERESOLVE. Lift once both accept 7. https://typescript-eslint.io/users/dependency-versions/",
+      "matchPackageNames": ["typescript"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
   ]
 }

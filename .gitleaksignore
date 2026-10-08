@@ -1,0 +1,8 @@
+# Test fixture, not a credential. src/middleware/index.test.ts sets the
+# API_KEYS env var to a placeholder and then sends that same placeholder as
+# a Bearer token, to check that apiKeyAuth accepts a configured key. The
+# value exists only in the unit test.
+74cb5756ee15292698cb13e3e9358a6193e5d0e1:src/middleware/index.test.ts:generic-api-key:493
+# The first version of this file quoted that same placeholder in a comment,
+# and gitleaks matched it there too (commit 333c328, line 2).
+333c328ffff3b0d7f7d53db65d54827ec44a172e:.gitleaksignore:generic-api-key:2
