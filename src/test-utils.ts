@@ -78,7 +78,7 @@ export function createMockRequest<T extends Partial<Request>>(overrides: T = {} 
     query: {},
     headers: {},
     ...overrides,
-  } as T;
+  };
 }
 
 /**

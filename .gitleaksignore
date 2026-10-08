@@ -1,0 +1,5 @@
+# Test fixture, not a credential: src/middleware/index.test.ts sets
+# process.env.API_KEYS = 'valid-key-123' and then sends
+# "Bearer valid-key-123" to check that apiKeyAuth accepts a configured key.
+# The value exists only in the unit test.
+74cb5756ee15292698cb13e3e9358a6193e5d0e1:src/middleware/index.test.ts:generic-api-key:493
