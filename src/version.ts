@@ -28,7 +28,8 @@ const loadPackageJson = (): PackageJson => {
     return JSON.parse(content) as PackageJson;
   } catch (error) {
     throw new Error(
-      `Failed to load package.json: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to load package.json: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 };

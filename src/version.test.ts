@@ -36,5 +36,26 @@ describe('version', () => {
       expect(DESCRIPTION).toBe(pkg.default.description);
     });
   });
-});
 
+  describe('when package.json cannot be read', () => {
+    afterEach(() => {
+      vi.doUnmock('node:fs');
+      vi.resetModules();
+    });
+
+    it('rethrows with the original error attached as cause', async () => {
+      const readError = new Error('ENOENT: no such file or directory');
+      vi.resetModules();
+      vi.doMock('node:fs', () => ({
+        readFileSync: (): never => {
+          throw readError;
+        },
+      }));
+
+      await expect(import('./version')).rejects.toMatchObject({
+        message: `Failed to load package.json: ${readError.message}`,
+        cause: readError,
+      });
+    });
+  });
+});
