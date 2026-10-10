@@ -33,7 +33,7 @@ jobs:
       # Auto-merge the Release PR so every merge to main triggers a release
       - name: Auto-merge Release PR
         if: steps.release.outputs.pr
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = ${{ steps.release.outputs.pr }};
