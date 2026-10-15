@@ -206,6 +206,36 @@ describe('handlers/webhook', () => {
         );
       }
     });
+
+    it('should not let a model override forge extra log lines', async () => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      mockReq = {
+        params: { name: 'test-webhook' },
+        body: {
+          text: 'Hello',
+          model: 'gpt-5\r\n[Webhook:admin] Model: forged\u001b[2K, PromptLength: 0',
+        },
+      };
+
+      try {
+        await handleWebhook(
+          mockReq as Request<{ name: string }>,
+          mockRes.asResponse(),
+          mockNext
+        );
+
+        const webhookLogs = logSpy.mock.calls
+          .map((args) => args.map(String).join(' '))
+          .filter((line) => line.startsWith('[Webhook:'));
+        expect(webhookLogs).toEqual([
+          '[Webhook:test-webhook] Model: gpt-5[Webhook:admin] Model: forged[2K, PromptLength: 0, PromptLength: 5',
+        ]);
+        for (const forbidden of ['\r', '\n', '\u001b']) {
+          expect(webhookLogs[0]).not.toContain(forbidden);
+        }
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
   });
 });
-
